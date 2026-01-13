@@ -46,10 +46,13 @@ export function markdownToEmailHtml(markdown: string): string {
     '<code style="background:#f5f5f5;color:#333;padding:2px 6px;border-radius:3px;font-family:\'SF Mono\',Monaco,monospace;font-size:14px;">$1</code>'
   );
 
-  // Links: [text](url) - accent color
+  // Links: [text](url) - accent color, with URL escaping to prevent attribute injection
   html = html.replace(
     /\[([^\]]+)\]\(([^)]+)\)/g,
-    `<a href="$2" style="color:${ACCENT_COLOR};text-decoration:underline;">$1</a>`
+    (_match, text, url) => {
+      const safeUrl = url.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+      return `<a href="${safeUrl}" style="color:${ACCENT_COLOR};text-decoration:underline;">${text}</a>`;
+    }
   );
 
   // Headers
@@ -57,12 +60,14 @@ export function markdownToEmailHtml(markdown: string): string {
   html = html.replace(/^## (.+)$/gm, '<h2 style="margin:24px 0 12px;font-size:18px;font-weight:600;color:#1a1a1a;">$1</h2>');
   html = html.replace(/^# (.+)$/gm, '<h1 style="margin:28px 0 16px;font-size:22px;font-weight:700;color:#1a1a1a;">$1</h1>');
 
+  // Numbered lists - convert first, use data attribute to distinguish from bullet lists
+  html = html.replace(/^\d+\. (.+)$/gm, '<li data-numbered style="margin:8px 0;color:#333;">$1</li>');
+  html = html.replace(/(<li data-numbered[^>]*>.*<\/li>\n?)+/g, '<ol style="margin:16px 0;padding-left:24px;">$&</ol>');
+  html = html.replace(/ data-numbered/g, '');
+
   // Bullet lists
   html = html.replace(/^- (.+)$/gm, '<li style="margin:8px 0;color:#333;">$1</li>');
   html = html.replace(/(<li[^>]*>.*<\/li>\n?)+/g, '<ul style="margin:16px 0;padding-left:24px;">$&</ul>');
-
-  // Numbered lists
-  html = html.replace(/^\d+\. (.+)$/gm, '<li style="margin:8px 0;color:#333;">$1</li>');
 
   // Paragraphs (double newlines)
   html = html.replace(/\n\n/g, '</p><p style="margin:16px 0;line-height:1.7;color:#333;">');

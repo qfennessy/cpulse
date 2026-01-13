@@ -401,60 +401,178 @@ Next steps:
 - Topic trend analysis over time
 - Feedback pattern visualization
 
-### Phase 5: Project Memory & Context-Aware Briefings
+### Phase 5: Project Memory & Proactive Intelligence
 
-**Inspired by ChatGPT Pulse's memory system**, this phase adds persistent project knowledge that makes briefings more relevant and actionable.
+**Inspired by ChatGPT Pulse**, this phase goes beyond memory to provide proactive technical research, architecture suggestions, and actionable guidance tailored to your projects.
+
+#### 5.1 Memory System
 
 **Memory Files:**
-- Support `~/.cpulse/memory.md` for global context
-- Support per-project `docs/memory.md` files (auto-discovered from git repos)
-- Memory files contain structured project knowledge:
+- `~/.cpulse/memory.md` - global context across all projects
+- Per-project `docs/memory.md` - auto-discovered from git repos
+- Memory contents:
   - Tech stack and architecture decisions
-  - Team workflows and conventions
-  - Domain-specific terminology
-  - Known pain points and priorities
+  - Team workflows and conventions (PRs to develop, AI code review)
+  - Domain terminology (genealogy, family storytelling)
+  - Known pain points and active priorities
   - Related projects and dependencies
 
-**Context-Aware Generation:**
-- Include relevant memory context in LLM prompts
-- Generate domain-aware suggestions (e.g., "The Firestore index may need updating for this new query")
-- Understand project relationships (e.g., cpulse briefing knows about cocos-story context)
-- Reference architectural decisions when suggesting improvements
-- Use tech stack knowledge for more specific recommendations
-
-**Smart Summarization:**
-- Understand monorepo structure (apps/web, apps/interviewer, services/functions)
-- Know which files are high-impact (e.g., @repo/types changes affect everything)
-- Recognize workflow patterns (PRs to develop, AI code review requirement)
-- Highlight changes that conflict with documented conventions
-
 **Memory Management:**
-- CLI command to view/edit memory: `cpulse memory`
-- Web interface for memory editing with preview
-- Auto-suggest memory additions from repeated session patterns
-- Memory versioning (track when context was added/updated)
+- CLI: `cpulse memory [show|edit|suggest]`
+- Web interface with preview
+- Auto-suggest additions from repeated session patterns
+- Version tracking (when context was added/updated)
 
-**Card Enhancements:**
-- New card type: "Architecture Reminder" - surface relevant decisions when patterns suggest drift
-- New card type: "Convention Check" - highlight when recent work may violate documented practices
-- Enhanced suggestions using domain knowledge
-- Cross-project insights (e.g., "Changes to @repo/types may require Python model updates")
+#### 5.2 Proactive Technical Research
 
-**Example Memory-Enhanced Briefing:**
+**The key insight from ChatGPT Pulse:** Don't just summarize what happened—research and suggest what should happen next.
 
+**Tech Stack Awareness:**
+- Monitor for new versions/features in your stack (Next.js, Firebase, Gemini, etc.)
+- Surface relevant updates: "Gemini 2.5 Flash now supports streaming function call args—this could improve your interviewer service latency"
+- Alert when dependencies have security updates or breaking changes
+
+**Pattern Library:**
+- Build a library of patterns relevant to your stack
+- Suggest patterns when session activity indicates a need:
+  - Working on pagination? → Suggest cursor-safe Firestore patterns
+  - Adding scheduled jobs? → Surface Cloud Scheduler best practices
+  - Building extraction pipelines? → Recommend structured output approaches
+
+**Production Readiness:**
+- Generate checklists based on what you're building:
+  - New Firestore queries → Index requirements checklist
+  - New Cloud Functions → Retry/idempotency checklist
+  - New API endpoints → Security rules alignment check
+
+#### 5.3 Architecture Suggestions
+
+**Proactive Design Guidance (like ChatGPT Pulse Example 1):**
+- When you add new queries, suggest composite indexes needed
+- When you modify data models, flag potential migration needs
+- When you add new collections, remind about tenantId-first indexing rule
+
+**Example Card - Production Checklist:**
 ```
-## Project Continuity: cocos-story
+## Production Readiness: stories pagination
 
-You've been working on the interviewer service's entity extraction pipeline.
+You added a new query in `apps/web/lib/stories.ts`:
+`where("tenantId", "==", tid), where("personIds", "array-contains", pid), orderBy("createdAt", "desc")`
 
-**Context reminder:** Per your architecture docs, all date fields must use
-the DateInfo format, not strings. I noticed 3 new date fields added yesterday
-in the fact extraction logic - verify they follow this pattern.
+**Index required:** This query needs a composite index. Add to `firestore.indexes.json`:
+{
+  "collectionGroup": "stories",
+  "fields": [
+    { "fieldPath": "tenantId", "order": "ASCENDING" },
+    { "fieldPath": "personIds", "arrayConfig": "CONTAINS" },
+    { "fieldPath": "createdAt", "order": "DESCENDING" }
+  ]
+}
 
-**Related:** The @repo/types package was updated last week. Since the Python
-service has contract tests against these types, you may want to run
-`pytest apps/interviewer -k contract` to verify sync.
+**Pagination check:** Your cursor uses `createdAt` alone. If collisions are possible,
+add `orderBy("__name__", "desc")` for stability.
 ```
+
+#### 5.4 Implementation Patterns
+
+**Delta Caching Pattern (from ChatGPT Pulse Example 2):**
+- When building slow queries, suggest caching strategies
+- Provide skeleton/placeholder patterns for perceived performance
+- Include code examples tailored to your stack (Redis + FastAPI or Firestore)
+
+**Example Card - Performance Pattern:**
+```
+## Suggestion: Delta Caching for Person Timeline
+
+Your Person Timeline queries are averaging 2.3s. Consider delta caching:
+
+1. **Cache skeleton:** Store outline (decades, section headers) with placeholders
+2. **Instant render:** Show skeleton immediately on repeat queries
+3. **Parallel fetch:** Load fresh events/facts in background
+4. **Patch in:** Stream updates to replace placeholders
+
+Cache key: `sha256(personId + dateRange + viewType + locale)`
+TTL: 7 days or until GEDCOM import version changes
+
+This pattern fits your existing Firestore + FastAPI stack. Want a code snippet?
+```
+
+#### 5.5 Extraction Pipeline Intelligence (from ChatGPT Pulse Example 3)
+
+**For interviewer service specifically:**
+- Track Gemini/Vertex AI updates relevant to entity extraction
+- Suggest structured output improvements over prompt parsing
+- Recommend validation patterns (Zod/Pydantic) for schema enforcement
+- Alert when new function calling features could improve accuracy
+
+**Example Card - Tech Update:**
+```
+## Tech Alert: Gemini 2.5 Flash Improvements
+
+Relevant to your interviewer service extraction pipeline:
+
+**Streaming function args:** Now supported—could reduce time-to-first-token
+for entity extraction responses.
+
+**Structured outputs:** JSON Schema enforcement is now first-class. Your current
+prompt-based parsing in `extract_entities()` could be replaced with schema-driven
+extraction for higher reliability.
+
+**Recommendation:** Consider migrating from free-form extraction to:
+- Define Person/Relationship/Event schemas in Pydantic
+- Use `response_schema` parameter instead of parsing
+- Add Zod validation at the TypeScript boundary
+
+This aligns with your existing contract test pattern between Python and TypeScript.
+```
+
+#### 5.6 Cross-Project Intelligence
+
+**Pattern Transfer:**
+- "You implemented cursor pagination well in cocos-story—cpulse briefing history could use the same pattern"
+- "The retry logic in interviewer service would improve cpulse's GitHub API calls"
+
+**Dependency Awareness:**
+- "@repo/types changed → Python contract tests may need updates"
+- "Firebase SDK updated in apps/web → check services/functions compatibility"
+
+#### 5.7 New Card Types
+
+| Card Type | Purpose | Trigger |
+|-----------|---------|---------|
+| **Production Checklist** | Index, security, idempotency checks | New queries/functions detected |
+| **Tech Update** | Relevant new features in your stack | Version monitoring |
+| **Pattern Suggestion** | Design patterns for current work | Session activity analysis |
+| **Architecture Reminder** | Surface relevant past decisions | Patterns suggest drift |
+| **Convention Check** | Flag potential violations | Code changes conflict with docs |
+| **Cross-Project Insight** | Apply learnings across repos | Similar patterns detected |
+
+#### 5.8 Implementation Approach
+
+**Data Flow:**
+```
+Memory Files + Session Activity + GitHub Activity
+           ↓
+    Context Analysis
+           ↓
+   Pattern Matching (what are you building?)
+           ↓
+   Research Generation (what should you know?)
+           ↓
+   Card Generation (actionable guidance)
+```
+
+**Research Sources:**
+- Project memory files (architecture, conventions)
+- Tech stack documentation (cached/indexed)
+- Recent session patterns (what problems are you solving?)
+- GitHub activity (what's changing in the codebase?)
+
+**Prompt Strategy:**
+- Include relevant memory context
+- Describe current work patterns detected
+- Ask for specific, actionable suggestions
+- Request code examples in the user's stack
 
 ---
 

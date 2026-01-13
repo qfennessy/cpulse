@@ -18,7 +18,7 @@
     "generate": "node dist/cli.js generate",
     "dev": "tsx src/cli.ts",
     "preview": "tsx src/cli.ts preview",
-    "test": "vitest",
+    "test": "vitest run",
     "link": "npm run build && npm link && npm run install:man",
     "unlink": "npm unlink -g cpulse && npm run uninstall:man",
     "install:man": "mkdir -p /usr/local/share/man/man1 && cp man/cpulse.1 /usr/local/share/man/man1/",

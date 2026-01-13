@@ -8,6 +8,26 @@ Commit Pulse analyzes your development activity over the past week and generates
 
 This was inspired by ChatGPT Pulse. As of 13 Jan 2026, Pulse is only available to ChatGPT Pro subscribers ($200/month)
 
+## Example Briefing
+
+<p align="center">
+  <img src="docs/images/briefing-header.png" alt="Briefing Header" width="600">
+</p>
+
+Daily briefings include **Project Continuity** cards summarizing your Claude Code sessions, files modified, and immediate blockers.
+
+<p align="center">
+  <img src="docs/images/briefing-code-review.png" alt="Code Review Card" width="600">
+</p>
+
+**Code Review** cards show your active PR queue, grouped by priority and comment count.
+
+<p align="center">
+  <img src="docs/images/briefing-patterns.png" alt="Patterns Card" width="600">
+</p>
+
+**Patterns** cards analyze your development habits and provide actionable recommendations.
+
 ## Features
 
 - **Claude Code Integration**: Parses your Claude Code session logs to identify projects worked on, open todos, and unresolved errors

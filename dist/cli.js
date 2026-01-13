@@ -1,5 +1,8 @@
 #!/usr/bin/env node
 import { Command } from 'commander';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import { loadConfig, createDefaultConfig, configExists, getConfigPath, generateAndSendBriefing, formatBriefingAsMarkdown, formatBriefingWithNarratives, getLatestBriefing, getBriefingStats, collectSignals, analyzePatterns, formatPatternSummary, extractAllQuestions, formatQuestionsForBriefing, loadFeedback, computeFeedbackStats, recordBriefingFeedback, loadTopicPriorities, updateTopicPriority, createWebServer, loadGlobalMemory, loadProjectMemory, } from './index.js';
 const program = new Command();
 function parseHours(value) {
@@ -13,7 +16,7 @@ function parseHours(value) {
 program
     .name('cpulse')
     .description('Commit Pulse - Personal daily briefings from Claude Code sessions and GitHub activity')
-    .version('0.1.0');
+    .version('0.7.0');
 program
     .command('init')
     .description('Create a default configuration file')
@@ -35,6 +38,7 @@ program
     .option('--hours <hours>', 'Hours of history to analyze', '168')
     .option('--preview', 'Print briefing to stdout instead of sending')
     .option('--simple', 'Use simple formatting without narratives')
+    .option('--all-cards', 'Generate all card types regardless of weekly rotation')
     .action(async (options) => {
     try {
         // Validate hours before loading config to fail fast
@@ -47,6 +51,7 @@ program
             send: options.send,
             save: options.save,
             hoursBack,
+            allCards: options.allCards,
         });
         if (options.preview || !options.send) {
             if (options.simple) {
@@ -552,6 +557,180 @@ program
     }
     catch (error) {
         console.error('Error:', error);
+        process.exit(1);
+    }
+});
+
+// Helper function to check if file needs updating (by mtime and size)
+function needsUpdate(srcPath, destPath) {
+    if (!fs.existsSync(destPath)) {
+        return true;
+    }
+    const srcStat = fs.statSync(srcPath);
+    const destStat = fs.statSync(destPath);
+    // Update if source is newer or sizes differ
+    return srcStat.mtimeMs > destStat.mtimeMs || srcStat.size !== destStat.size;
+}
+
+// Helper function to recursively sync directory, only updating changed files
+function syncDirSync(src, dest, stats = { updated: 0, skipped: 0, added: 0 }) {
+    fs.mkdirSync(dest, { recursive: true });
+    const entries = fs.readdirSync(src, { withFileTypes: true });
+    for (const entry of entries) {
+        const srcPath = path.join(src, entry.name);
+        const destPath = path.join(dest, entry.name);
+        if (entry.isDirectory()) {
+            syncDirSync(srcPath, destPath, stats);
+        } else {
+            if (!fs.existsSync(destPath)) {
+                fs.copyFileSync(srcPath, destPath);
+                stats.added++;
+            } else if (needsUpdate(srcPath, destPath)) {
+                fs.copyFileSync(srcPath, destPath);
+                stats.updated++;
+            } else {
+                stats.skipped++;
+            }
+        }
+    }
+    return stats;
+}
+
+program
+    .command('install')
+    .description('Install cpulse to ~/.cpulse/bin for global use')
+    .option('--link', 'Create symlinks in /usr/local/bin and /usr/local/share/man')
+    .option('--force', 'Force reinstall of npm dependencies')
+    .action(async (options) => {
+    try {
+        const homeDir = process.env.HOME;
+        if (!homeDir) {
+            console.error('Error: HOME environment variable not set');
+            process.exit(1);
+        }
+
+        const installDir = path.join(homeDir, '.cpulse', 'bin');
+        const cliPath = path.join(installDir, 'cli.js');
+
+        // Find the source directory (dist/)
+        const __filename = fileURLToPath(import.meta.url);
+        const __dirname = path.dirname(__filename);
+        const srcDir = __dirname;
+
+        // Find root package.json (one level up from dist/)
+        const rootDir = path.dirname(srcDir);
+        const packageJsonPath = path.join(rootDir, 'package.json');
+        const destPackageJsonPath = path.join(installDir, 'package.json');
+
+        const isNewInstall = !fs.existsSync(installDir);
+        console.log(`${isNewInstall ? 'Installing' : 'Updating'} cpulse at ${installDir}...`);
+
+        // Sync dist/ files (only copy changed files)
+        const stats = syncDirSync(srcDir, installDir);
+
+        // Sync package.json
+        let packageJsonChanged = false;
+        if (fs.existsSync(packageJsonPath)) {
+            if (needsUpdate(packageJsonPath, destPackageJsonPath)) {
+                fs.copyFileSync(packageJsonPath, destPackageJsonPath);
+                packageJsonChanged = true;
+                stats.updated++;
+            } else {
+                stats.skipped++;
+            }
+        }
+
+        // Make CLI executable
+        fs.chmodSync(cliPath, '755');
+
+        // Report sync stats
+        if (stats.added > 0 || stats.updated > 0) {
+            console.log(`✓ Files synced (${stats.added} added, ${stats.updated} updated, ${stats.skipped} unchanged)`);
+        } else {
+            console.log(`✓ Already up to date (${stats.skipped} files unchanged)`);
+        }
+
+        // Run npm install only if package.json changed, node_modules missing, or --force
+        const nodeModulesPath = path.join(installDir, 'node_modules');
+        const needsDeps = packageJsonChanged || !fs.existsSync(nodeModulesPath) || options.force;
+
+        if (needsDeps) {
+            console.log('Installing dependencies...');
+            const { execSync } = await import('child_process');
+            try {
+                execSync('npm install --omit=dev --silent', {
+                    cwd: installDir,
+                    stdio: 'pipe',
+                });
+                console.log('✓ Dependencies installed');
+            } catch (npmError) {
+                console.warn('Warning: Could not install dependencies automatically.');
+                console.log(`Run manually: cd ${installDir} && npm install --omit=dev`);
+            }
+        }
+
+        // Install man page (only if changed)
+        const manDir = path.join(homeDir, '.cpulse', 'man', 'man1');
+        const manPageSrc = path.join(srcDir, 'cpulse.1');
+        const manPageDest = path.join(manDir, 'cpulse.1');
+
+        if (fs.existsSync(manPageSrc)) {
+            fs.mkdirSync(manDir, { recursive: true });
+            if (needsUpdate(manPageSrc, manPageDest)) {
+                fs.copyFileSync(manPageSrc, manPageDest);
+                console.log('✓ Man page updated');
+            }
+        }
+
+        console.log('\n✓ Installation complete!');
+        console.log(`\nInstalled to: ${installDir}`);
+
+        console.log('\nTo use cpulse globally, add to your shell config (~/.zshrc or ~/.bashrc):');
+        console.log(`\n  # Alias for cpulse command`);
+        console.log(`  alias cpulse='node ${cliPath}'`);
+        console.log(`\n  # Man page access`);
+        console.log(`  export MANPATH="${path.join(homeDir, '.cpulse', 'man')}:$MANPATH"`);
+
+        if (options.link) {
+            const binLinkPath = '/usr/local/bin/cpulse';
+            const manLinkDir = '/usr/local/share/man/man1';
+            const manLinkPath = path.join(manLinkDir, 'cpulse.1');
+
+            console.log(`\nCreating symlinks (may require sudo)...`);
+
+            // Symlink the CLI
+            try {
+                if (fs.existsSync(binLinkPath)) {
+                    fs.unlinkSync(binLinkPath);
+                }
+                fs.symlinkSync(cliPath, binLinkPath);
+                console.log(`✓ ${binLinkPath} -> ${cliPath}`);
+            } catch (linkError) {
+                console.error(`✗ Failed to create ${binLinkPath}: ${linkError.message}`);
+                console.log(`  Run: sudo ln -sf ${cliPath} ${binLinkPath}`);
+            }
+
+            // Symlink the man page
+            if (fs.existsSync(manPageDest)) {
+                try {
+                    // Ensure man directory exists
+                    if (!fs.existsSync(manLinkDir)) {
+                        fs.mkdirSync(manLinkDir, { recursive: true });
+                    }
+                    if (fs.existsSync(manLinkPath)) {
+                        fs.unlinkSync(manLinkPath);
+                    }
+                    fs.symlinkSync(manPageDest, manLinkPath);
+                    console.log(`✓ ${manLinkPath} -> ${manPageDest}`);
+                } catch (linkError) {
+                    console.error(`✗ Failed to create ${manLinkPath}: ${linkError.message}`);
+                    console.log(`  Run: sudo ln -sf ${manPageDest} ${manLinkPath}`);
+                }
+            }
+        }
+    }
+    catch (error) {
+        console.error('Error during installation:', error.message);
         process.exit(1);
     }
 });

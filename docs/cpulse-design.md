@@ -3,7 +3,7 @@
 **Created:** 2026-01-12
 **Last Updated:** 2026-01-13
 
-**Status:** Phase 6 implementation complete
+**Status:** Phase 7 implementation complete
 
 ---
 
@@ -601,6 +601,15 @@ Memory Files + Session Activity + GitHub Activity
 - Tech stack detection from package.json, requirements.txt, go.mod, etc.
 - Web search integration for current best practices (7-day cache)
 - `cpulse cards` CLI command for managing card types
+
+### Phase 7: Polish and Installation
+
+- **Email branding** - Changed email subject from "cpulse" to "Commit Pulse" for professional appearance
+- **All-cards option** - Added `--all-cards` CLI flag to generate all card types regardless of weekly rotation, useful for testing and debugging
+- **Install command** - Added `cpulse install` command to copy the application to `~/.cpulse/bin/` for runtime use separate from source
+  - `--force` flag to overwrite existing installation
+  - `--link` flag to create symlink in `/usr/local/bin` (requires sudo)
+  - Provides shell configuration instructions for PATH setup
 
 ---
 

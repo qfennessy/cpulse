@@ -7,7 +7,11 @@ import {
 } from './sources/claude-code.js';
 import { getGitHubActivity } from './sources/github.js';
 import { generateBriefing } from './generation/articles.js';
-import { sendBriefingEmail, formatBriefingAsMarkdown } from './delivery/email.js';
+import {
+  sendBriefingEmail,
+  formatBriefingAsMarkdown,
+  formatBriefingWithNarratives,
+} from './delivery/email.js';
 import { saveBriefing, getLatestBriefing } from './storage/briefings.js';
 
 export async function collectSignals(
@@ -45,10 +49,15 @@ export async function collectSignals(
   return signals;
 }
 
+export interface GenerateBriefingResult {
+  briefing: Briefing;
+  signals: ExtractedSignals;
+}
+
 export async function generateAndSendBriefing(
   config: Config,
   options: { send?: boolean; save?: boolean; hoursBack?: number } = {}
-): Promise<Briefing> {
+): Promise<GenerateBriefingResult> {
   const { send = true, save = true, hoursBack = 168 } = options;
 
   // Collect signals
@@ -62,12 +71,12 @@ export async function generateAndSendBriefing(
     saveBriefing(config.data_dir, briefing);
   }
 
-  // Send email
+  // Send email with enhanced presentation (includes narratives)
   if (send) {
-    await sendBriefingEmail(config.email, briefing);
+    await sendBriefingEmail(config.email, briefing, signals);
   }
 
-  return briefing;
+  return { briefing, signals };
 }
 
 export {
@@ -77,8 +86,31 @@ export {
   getConfigPath,
 } from './config.js';
 
-export { formatBriefingAsMarkdown } from './delivery/email.js';
+export { formatBriefingAsMarkdown, formatBriefingWithNarratives } from './delivery/email.js';
 export { getLatestBriefing, loadBriefings, getBriefingStats } from './storage/briefings.js';
+
+// Presentation module exports
+export {
+  prLink,
+  commitLink,
+  fileLink,
+  fileLinkWithLine,
+  branchCompareLink,
+  formatPRList,
+  formatCommitList,
+  wrapWithNarratives,
+  formatBriefingWithNarratives as formatWithNarratives,
+  renderBriefingHtml,
+} from './presentation/index.js';
+
+// Worktree detection exports
+export {
+  isWorktree,
+  getMainRepoPath,
+  getParentProject,
+  groupByParentProject,
+  formatProjectWithWorktrees,
+} from './sources/worktree.js';
 
 // Intelligence module exports
 export {

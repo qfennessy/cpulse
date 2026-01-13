@@ -8,6 +8,7 @@ import {
   getConfigPath,
   generateAndSendBriefing,
   formatBriefingAsMarkdown,
+  formatBriefingWithNarratives,
   getLatestBriefing,
   getBriefingStats,
   collectSignals,
@@ -20,6 +21,7 @@ import {
   recordBriefingFeedback,
   loadTopicPriorities,
   updateTopicPriority,
+  groupByParentProject,
 } from './index.js';
 import type { BriefingFeedback } from './types/index.js';
 
@@ -61,6 +63,7 @@ program
   .option('--no-save', 'Generate but do not save to history')
   .option('--hours <hours>', 'Hours of history to analyze', '168')
   .option('--preview', 'Print briefing to stdout instead of sending')
+  .option('--simple', 'Use simple formatting without narratives')
   .action(async (options) => {
     try {
       // Validate hours before loading config to fail fast
@@ -71,14 +74,18 @@ program
         options.send = false;
       }
 
-      const briefing = await generateAndSendBriefing(config, {
+      const { briefing, signals } = await generateAndSendBriefing(config, {
         send: options.send,
         save: options.save,
         hoursBack,
       });
 
       if (options.preview || !options.send) {
-        console.log(formatBriefingAsMarkdown(briefing));
+        if (options.simple) {
+          console.log(formatBriefingAsMarkdown(briefing));
+        } else {
+          console.log(formatBriefingWithNarratives(briefing, signals));
+        }
       } else {
         console.log(`Briefing sent to ${config.email.to}`);
       }

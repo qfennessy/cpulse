@@ -17,6 +17,16 @@ import {
   type PatternAnalysis,
   type OpenQuestion,
 } from '../intelligence/index.js';
+import {
+  commitLinkWithMessage,
+  prLinkWithTitle,
+  branchCompareLink,
+} from '../presentation/index.js';
+import {
+  getParentProject,
+  formatProjectWithWorktrees,
+  groupByParentProject,
+} from '../sources/worktree.js';
 
 // Re-export intelligence types for external use
 export type { PatternAnalysis, OpenQuestion };
@@ -35,8 +45,17 @@ Your communication style:
 Your goal is to help the developer pick up where they left off and stay oriented on their projects.`;
 
 function formatSessionSummary(session: ClaudeCodeSession): string {
+  // Check if this session is part of a worktree
+  const parentProject = getParentProject(session.projectPath, session.project);
+  const isWorktree = parentProject !== session.project;
+
+  const projectInfo = isWorktree
+    ? `Project: ${session.project} (worktree of **${parentProject}**)`
+    : `Project: ${session.project}`;
+
   const lines = [
-    `Project: ${session.project} (${session.projectPath})`,
+    projectInfo,
+    `Path: ${session.projectPath}`,
     `Time: ${session.startTime.toLocaleString()} - ${session.endTime?.toLocaleString() || 'ongoing'}`,
     `Files modified: ${session.filesModified.slice(0, 5).join(', ')}${session.filesModified.length > 5 ? ` (+${session.filesModified.length - 5} more)` : ''}`,
   ];
@@ -67,7 +86,51 @@ function formatSessionSummary(session: ClaudeCodeSession): string {
   return lines.join('\n');
 }
 
-function formatCommitsSummary(commits: GitHubCommit[]): string {
+/**
+ * Format sessions grouped by parent project (including worktrees).
+ */
+function formatGroupedSessionsSummary(sessions: ClaudeCodeSession[]): string {
+  const groups = groupByParentProject(sessions);
+  const lines: string[] = [];
+
+  for (const [parentProject, { items, worktrees }] of groups) {
+    const projectLabel = formatProjectWithWorktrees(parentProject, worktrees);
+    lines.push(`\n**${projectLabel}:**`);
+
+    // Show worktree breakdown if multiple
+    if (worktrees.size > 1) {
+      const worktreeList = Array.from(worktrees).slice(0, 5);
+      lines.push(`  Worktrees: ${worktreeList.join(', ')}${worktrees.size > 5 ? ` (+${worktrees.size - 5} more)` : ''}`);
+    }
+
+    // Summarize sessions for this project group
+    const sessionCount = items.length;
+    const filesModified = new Set<string>();
+    const todos: string[] = [];
+
+    for (const session of items) {
+      for (const file of session.filesModified) {
+        filesModified.add(file);
+      }
+      for (const todo of session.todoItems) {
+        if (todo.status !== 'completed') {
+          todos.push(todo.content);
+        }
+      }
+    }
+
+    lines.push(`  Sessions: ${sessionCount}`);
+    lines.push(`  Files modified: ${filesModified.size}`);
+
+    if (todos.length > 0) {
+      lines.push(`  Open todos: ${todos.slice(0, 3).join('; ')}${todos.length > 3 ? ` (+${todos.length - 3} more)` : ''}`);
+    }
+  }
+
+  return lines.join('\n');
+}
+
+function formatCommitsSummary(commits: GitHubCommit[], withLinks = true): string {
   const byRepo: Record<string, GitHubCommit[]> = {};
   for (const commit of commits) {
     if (!byRepo[commit.repo]) byRepo[commit.repo] = [];
@@ -76,11 +139,16 @@ function formatCommitsSummary(commits: GitHubCommit[]): string {
 
   const lines: string[] = [];
   for (const [repo, repoCommits] of Object.entries(byRepo)) {
-    lines.push(`\n${repo}:`);
+    lines.push(`\n**${repo}:**`);
     for (const commit of repoCommits.slice(0, 5)) {
-      lines.push(
-        `  - ${commit.sha}: ${commit.message} (+${commit.additions}/-${commit.deletions})`
-      );
+      if (withLinks) {
+        const link = commitLinkWithMessage(repo, commit.sha, commit.message);
+        lines.push(`  - ${link} (+${commit.additions}/-${commit.deletions})`);
+      } else {
+        lines.push(
+          `  - ${commit.sha.substring(0, 7)}: ${commit.message} (+${commit.additions}/-${commit.deletions})`
+        );
+      }
     }
     if (repoCommits.length > 5) {
       lines.push(`  ... and ${repoCommits.length - 5} more commits`);
@@ -90,14 +158,43 @@ function formatCommitsSummary(commits: GitHubCommit[]): string {
   return lines.join('\n');
 }
 
-function formatPRsSummary(prs: GitHubPR[]): string {
+function formatPRsSummary(prs: GitHubPR[], withLinks = true): string {
   if (prs.length === 0) return 'No open PRs';
 
   const lines: string[] = [];
   for (const pr of prs) {
     const draft = pr.isDraft ? ' [DRAFT]' : '';
     const comments = pr.reviewComments > 0 ? ` (${pr.reviewComments} comments)` : '';
-    lines.push(`- ${pr.repo}#${pr.number}: ${pr.title}${draft}${comments}`);
+    if (withLinks) {
+      const link = prLinkWithTitle(pr.repo, pr.number, pr.title);
+      lines.push(`- ${link}${draft}${comments}`);
+    } else {
+      lines.push(`- ${pr.repo}#${pr.number}: ${pr.title}${draft}${comments}`);
+    }
+  }
+
+  return lines.join('\n');
+}
+
+function formatStaleBranchesSummary(branches: string[], repos: string[], withLinks = true): string {
+  if (branches.length === 0) return '';
+
+  const lines: string[] = ['\n**Stale branches (>14 days):**'];
+
+  // Try to associate branches with repos based on common patterns
+  // For now, just list them. In a more sophisticated version, we'd track repo with branch
+  for (const branch of branches.slice(0, 5)) {
+    if (withLinks && repos.length > 0) {
+      // Use first repo as default - this is a simplification
+      const link = branchCompareLink(repos[0], branch);
+      lines.push(`- ${link}`);
+    } else {
+      lines.push(`- ${branch}`);
+    }
+  }
+
+  if (branches.length > 5) {
+    lines.push(`... and ${branches.length - 5} more stale branches`);
   }
 
   return lines.join('\n');
@@ -111,8 +208,10 @@ export async function generateProjectContinuityCard(
   const sessions = signals.claudeCode.recentSessions;
   if (sessions.length === 0) return null;
 
-  const sessionSummaries = sessions
-    .slice(0, 5)
+  // Use grouped summary for overview, detailed for recent sessions
+  const groupedSummary = formatGroupedSessionsSummary(sessions);
+  const recentSessionDetails = sessions
+    .slice(0, 3)
     .map(formatSessionSummary)
     .join('\n\n---\n\n');
 
@@ -124,13 +223,16 @@ export async function generateProjectContinuityCard(
 
   const prompt = `Based on these recent Claude Code sessions, generate a "Project Continuity" briefing card.
 
-Sessions from the last 7 days:
-${sessionSummaries}
+Project Overview (grouped by parent project, including worktrees):
+${groupedSummary}
+
+Recent Session Details:
+${recentSessionDetails}
 ${todosText}
 
 Generate a briefing that:
-1. Identifies the main project(s) worked on
-2. Summarizes what was accomplished
+1. Identifies the main project(s) worked on (note: worktrees are branches of the same project)
+2. Summarizes what was accomplished across all worktrees
 3. Notes any unfinished work or open todos
 4. Suggests concrete next steps
 
@@ -178,14 +280,16 @@ export async function generateCodeReviewCard(
 
   if (commits.length === 0 && pullRequests.length === 0) return null;
 
-  const commitsSummary = formatCommitsSummary(commits);
-  const prsSummary = formatPRsSummary(pullRequests);
-  const staleText =
-    staleBranches.length > 0
-      ? `\n\nStale branches (>14 days):\n${staleBranches.slice(0, 5).join('\n')}`
-      : '';
+  // Get list of repos for link generation
+  const repos = [...new Set(commits.map((c) => c.repo))];
+
+  const commitsSummary = formatCommitsSummary(commits, true);
+  const prsSummary = formatPRsSummary(pullRequests, true);
+  const staleText = formatStaleBranchesSummary(staleBranches, repos, true);
 
   const prompt = `Based on this GitHub activity, generate a "Code Review" briefing card.
+
+Note: The commits and PRs include markdown links - preserve these links in your output where relevant.
 
 Recent commits (last 7 days):
 ${commitsSummary}

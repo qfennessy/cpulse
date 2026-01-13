@@ -99,19 +99,36 @@ export interface GitHubPR {
   repo: string;
   createdAt: Date;
   updatedAt: Date;
+  mergedAt?: Date;
   reviewComments: number;
   isDraft: boolean;
+}
+
+export interface PostMergeComment {
+  id: number;
+  prNumber: number;
+  prTitle: string;
+  repo: string;
+  author: string;
+  body: string;
+  createdAt: Date;
+  mergedAt: Date;
+  url: string;
+  isReviewComment: boolean;
+  path?: string;
+  line?: number;
 }
 
 export interface GitHubActivity {
   commits: GitHubCommit[];
   pullRequests: GitHubPR[];
   staleBranches: string[];
+  postMergeComments: PostMergeComment[];
 }
 
 // Article types
 export interface ArticleCard {
-  type: 'project_continuity' | 'code_review' | 'learning' | 'open_questions' | 'suggestions' | 'patterns' | 'weekly_summary';
+  type: 'project_continuity' | 'code_review' | 'learning' | 'open_questions' | 'suggestions' | 'patterns' | 'weekly_summary' | 'post_merge_feedback';
   title: string;
   content: string;
   priority: number;

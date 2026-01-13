@@ -29,6 +29,7 @@ export async function collectSignals(
       commits: [],
       pullRequests: [],
       staleBranches: [],
+      postMergeComments: [],
     },
   };
 
@@ -130,3 +131,11 @@ export {
   type FeedbackStats,
   type TopicPriority,
 } from './intelligence/index.js';
+
+// Web module exports
+export {
+  createWebServer,
+  getAnalytics,
+  type WebServerOptions,
+  type Analytics,
+} from './web/index.js';

@@ -1,7 +1,7 @@
 {
   "name": "cpulse",
   "version": "0.1.0",
-  "description": "Personal daily briefings from Claude Code sessions and GitHub activity",
+  "description": "Commit Pulse - Personal daily briefings from Claude Code sessions and GitHub activity",
   "type": "module",
   "engines": {
     "node": "^20.0.0"

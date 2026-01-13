@@ -1,4 +1,4 @@
-# cpulse Design Document
+# Commit Pulse (cpulse) Design Document
 
 **Created:** 2026-01-12
 **Last Updated:** 2026-01-13
@@ -9,7 +9,7 @@
 
 ## Overview
 
-cpulse is a personal briefing system that generates thoughtful, actionable articles based on your interactions with Claude, Claude Code sessions, and GitHub activity. Like ChatGPT Pulse, it synthesizes your activity overnight and delivers personalized insights via email each morning.
+Commit Pulse (cpulse) is a personal briefing system that generates thoughtful, actionable articles based on your interactions with Claude, Claude Code sessions, and GitHub activity. Like ChatGPT Pulse, it synthesizes your activity overnight and delivers personalized insights via email each morning.
 
 The briefings are presented in Claude Code's communication style: concise, direct, technically accurate, and formatted in clean markdown.
 

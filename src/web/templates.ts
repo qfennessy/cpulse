@@ -251,7 +251,7 @@ function baseTemplate(title: string, content: string, activeNav: string = ''): s
 <body>
   <header>
     <div class="container">
-      <a href="/" class="logo">cpulse</a>
+      <a href="/" class="logo">Commit Pulse</a>
       <nav>
         <a href="/"${activeNav === 'briefings' ? ' class="active"' : ''}>Briefings</a>
         <a href="/analytics"${activeNav === 'analytics' ? ' class="active"' : ''}>Analytics</a>

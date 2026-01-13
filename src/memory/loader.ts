@@ -12,6 +12,7 @@ import { execSync } from 'child_process';
 export interface ProjectMemory {
   projectName: string;
   projectPath: string;
+  gitRoot: string | null;
   content: string;
   sections: MemorySection[];
   lastModified: Date;
@@ -75,7 +76,11 @@ function parseMemorySections(content: string): MemorySection[] {
 /**
  * Load a memory file from a path.
  */
-export function loadMemoryFile(filePath: string, projectName: string): ProjectMemory | null {
+export function loadMemoryFile(
+  filePath: string,
+  projectName: string,
+  gitRoot: string | null = null
+): ProjectMemory | null {
   if (!existsSync(filePath)) {
     return null;
   }
@@ -87,6 +92,7 @@ export function loadMemoryFile(filePath: string, projectName: string): ProjectMe
     return {
       projectName,
       projectPath: dirname(filePath),
+      gitRoot,
       content,
       sections: parseMemorySections(content),
       lastModified: stats.mtime,
@@ -160,11 +166,13 @@ export function loadProjectMemory(projectPath: string): ProjectMemory | null {
   }
 
   const projectName = extractProjectName(searchPath);
-  return loadMemoryFile(memoryPath, projectName);
+  return loadMemoryFile(memoryPath, projectName, gitRoot);
 }
 
 /**
  * Load all memory context (global + project-specific).
+ * Map is keyed by full path (git root or project path) to avoid collisions
+ * when multiple projects share the same directory name.
  */
 export function loadMemoryContext(projectPaths: string[]): MemoryContext {
   const context: MemoryContext = {
@@ -172,7 +180,7 @@ export function loadMemoryContext(projectPaths: string[]): MemoryContext {
     projects: new Map(),
   };
 
-  // Deduplicate project paths by git root
+  // Deduplicate and store by full path to avoid collisions
   const seenRoots = new Set<string>();
 
   for (const path of projectPaths) {
@@ -186,7 +194,8 @@ export function loadMemoryContext(projectPaths: string[]): MemoryContext {
 
     const memory = loadProjectMemory(path);
     if (memory) {
-      context.projects.set(memory.projectName, memory);
+      // Use full path as key to avoid collision when dirs share same name
+      context.projects.set(key, memory);
     }
   }
 
@@ -194,9 +203,41 @@ export function loadMemoryContext(projectPaths: string[]): MemoryContext {
 }
 
 /**
+ * Find memory by project identifier (name or path).
+ * Searches by exact path match, git root match, or project name match.
+ */
+function findMemoryByProject(
+  context: MemoryContext,
+  projectIdentifier: string
+): ProjectMemory | null {
+  // Direct path match
+  if (context.projects.has(projectIdentifier)) {
+    return context.projects.get(projectIdentifier)!;
+  }
+
+  // Search by project name or path ending
+  for (const [_key, memory] of context.projects) {
+    // Match by project name
+    if (memory.projectName === projectIdentifier) {
+      return memory;
+    }
+    // Match by git root ending (e.g., "cpulse" matches "/Users/q/src/cpulse")
+    if (memory.gitRoot?.endsWith(`/${projectIdentifier}`)) {
+      return memory;
+    }
+    // Match by project path ending
+    if (memory.projectPath.endsWith(`/${projectIdentifier}`)) {
+      return memory;
+    }
+  }
+
+  return null;
+}
+
+/**
  * Format memory context for inclusion in LLM prompts.
  */
-export function formatMemoryForPrompt(context: MemoryContext, projectName?: string): string {
+export function formatMemoryForPrompt(context: MemoryContext, projectIdentifier?: string): string {
   const parts: string[] = [];
 
   // Add global memory if present
@@ -207,15 +248,24 @@ export function formatMemoryForPrompt(context: MemoryContext, projectName?: stri
   }
 
   // Add project-specific memory
-  if (projectName && context.projects.has(projectName)) {
-    const projectMemory = context.projects.get(projectName)!;
-    parts.push(`=== ${projectName} Project Context ===`);
-    parts.push(projectMemory.content);
-    parts.push('');
+  if (projectIdentifier) {
+    const projectMemory = findMemoryByProject(context, projectIdentifier);
+    if (projectMemory) {
+      parts.push(`=== ${projectMemory.projectName} Project Context ===`);
+      parts.push(projectMemory.content);
+      parts.push('');
+    } else if (context.projects.size > 0) {
+      // Fallback: include all if no match found
+      for (const [_key, memory] of context.projects) {
+        parts.push(`=== ${memory.projectName} Project Context ===`);
+        parts.push(memory.content);
+        parts.push('');
+      }
+    }
   } else if (context.projects.size > 0) {
     // Include all project memories if no specific project requested
-    for (const [name, memory] of context.projects) {
-      parts.push(`=== ${name} Project Context ===`);
+    for (const [_key, memory] of context.projects) {
+      parts.push(`=== ${memory.projectName} Project Context ===`);
       parts.push(memory.content);
       parts.push('');
     }
@@ -257,8 +307,8 @@ export function getMemorySummary(context: MemoryContext): string {
 
   if (context.projects.size > 0) {
     lines.push(`Project memories: ${context.projects.size}`);
-    for (const [name, memory] of context.projects) {
-      lines.push(`  - ${name}: ${memory.sections.length} sections`);
+    for (const [_path, memory] of context.projects) {
+      lines.push(`  - ${memory.projectName}: ${memory.sections.length} sections`);
     }
   } else {
     lines.push('Project memories: none found');

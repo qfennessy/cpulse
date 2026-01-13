@@ -1,0 +1,50 @@
+{
+  "name": "cpulse",
+  "version": "0.7.0",
+  "description": "Commit Pulse - Personal daily briefings from Claude Code sessions and GitHub activity",
+  "type": "module",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "bin": {
+    "cpulse": "dist/cli.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "cpulse": "node dist/cli.js",
+    "start": "node dist/cli.js serve",
+    "generate": "node dist/cli.js generate",
+    "dev": "tsx src/cli.ts",
+    "preview": "tsx src/cli.ts preview",
+    "test": "vitest"
+  },
+  "keywords": [
+    "briefings",
+    "claude",
+    "github",
+    "developer-tools",
+    "productivity"
+  ],
+  "author": "Quentin Fennessy",
+  "license": "MIT",
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.39.0",
+    "commander": "^12.1.0",
+    "express": "^4.21.2",
+    "js-yaml": "^4.1.0",
+    "marked": "^15.0.6",
+    "nodemailer": "^6.10.0",
+    "octokit": "^4.1.0"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.6",
+    "@types/js-yaml": "^4.0.9",
+    "@types/node": "^20.0.0",
+    "@types/nodemailer": "^6.4.17",
+    "tsx": "^4.19.0",
+    "typescript": "^5.7.0",
+    "vitest": "^2.1.0"
+  }
+}

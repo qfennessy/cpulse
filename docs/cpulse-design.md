@@ -1,15 +1,15 @@
-# cpulse Design Document
+# Commit Pulse (cpulse) Design Document
 
 **Created:** 2026-01-12
-**Last Updated:** 2026-01-12
+**Last Updated:** 2026-01-13
 
-**Status:** Design approved
+**Status:** Phase 8 implementation complete
 
 ---
 
 ## Overview
 
-cpulse is a personal briefing system that generates thoughtful, actionable articles based on your interactions with Claude, Claude Code sessions, and GitHub activity. Like ChatGPT Pulse, it synthesizes your activity overnight and delivers personalized insights via email each morning.
+Commit Pulse (cpulse) is a personal briefing system that generates thoughtful, actionable articles based on your interactions with Claude, Claude Code sessions, and GitHub activity. Like ChatGPT Pulse, it synthesizes your activity overnight and delivers personalized insights via email each morning.
 
 The briefings are presented in Claude Code's communication style: concise, direct, technically accurate, and formatted in clean markdown.
 
@@ -172,7 +172,7 @@ generate a "Project Continuity" card that:
 ```
 
 ```
-Given the user's last 10 GitHub commits to the cpulse repository,
+Given the user's last 10 GitHub commits to the Commit Pulse repository,
 generate a "Code Review Digest" that:
 - Groups commits by feature/intent
 - Flags any commits without corresponding tests
@@ -202,8 +202,16 @@ generate a "Code Review Digest" that:
 # ~/.cpulse/config.yaml
 email:
   to: quentin@example.com
+  from: quentin@example.com
   send_time: "06:00"
   timezone: "America/Los_Angeles"
+  smtp:
+    host: smtp.gmail.com
+    port: 587
+    secure: false  # true for 465, false for other ports
+    auth:
+      user: quentin@example.com
+      pass: app-password-here  # Use app password, not account password
 
 sources:
   claude_code:
@@ -235,10 +243,10 @@ The email is rendered as clean HTML that degrades gracefully to plain text. Each
 - Code snippets where relevant (syntax highlighted)
 - Inline feedback buttons
 
-Example card:
+Example card (Phase 1-2, plain):
 
 ```
-## Project Continuity: cpulse Authentication
+## Project Continuity: Commit Pulse Authentication
 
 Yesterday you worked on JWT token validation in `src/auth/validate.ts`.
 The session ended with two failing tests in `auth.test.ts`:
@@ -253,6 +261,29 @@ Next steps:
 [Helpful] [Not helpful] [Snooze this project]
 ```
 
+Example card (Phase 3, with links and narrative):
+
+```
+Let's pick up where you left off with authentication...
+
+## Project Continuity: cpulse Authentication
+
+Yesterday you worked on JWT token validation in [src/auth/validate.ts:15](https://github.com/owner/cpulse/blob/main/src/auth/validate.ts#L15).
+The session ended with two failing tests in [auth.test.ts](https://github.com/owner/cpulse/blob/main/tests/auth.test.ts):
+
+- `should reject expired tokens` - [line 42](https://github.com/owner/cpulse/blob/main/tests/auth.test.ts#L42)
+- `should handle malformed tokens` - timeout after 5000ms
+
+Related: Your PR [#47](https://github.com/owner/cpulse/pull/47) is still open and has 2 new comments.
+
+Next steps:
+- Check if the token expiry logic handles edge cases around midnight UTC
+- The timeout suggests an unresolved promise—look for missing `await`
+- Address review comments on PR #47
+
+[👍 Helpful] [👎 Not helpful] [💤 Snooze]
+```
+
 ---
 
 ## Technical Stack (Proposed)
@@ -263,7 +294,7 @@ Next steps:
 | Scheduler | node-cron or system cron | Simple, reliable |
 | Claude API | @anthropic-ai/sdk | Article generation |
 | GitHub API | Octokit | Commit/PR data |
-| Email | Resend or SendGrid | Reliable delivery, good DX |
+| Email | SMTP (nodemailer) | Uses existing email account, no third-party signup |
 | Storage | SQLite or JSON files | Simple, local-first |
 | Config | YAML | Human-readable |
 
@@ -287,6 +318,7 @@ Next steps:
 | Briefing frequency | Daily batch only | Keeps complexity low; morning email is the primary use case |
 | Multi-machine support | Single machine | Simplifies initial implementation; can revisit if needed |
 | Briefing retention | Indefinite | Historical briefings provide value for pattern analysis and reference |
+| Email delivery | SMTP via nodemailer | Uses existing email account; no third-party service signup required |
 
 ---
 
@@ -306,12 +338,318 @@ Next steps:
 - Feedback loop integration
 - Curated topic priorities
 
-### Phase 3: Polish
+### Phase 3: Enhanced Presentation
 
-- Learning & Concepts cards with spaced repetition
-- Proactive suggestions
-- Web interface for configuration and history
-- Briefing search and analytics
+**Worktree Recognition:**
+- Detect git worktrees and associate with parent project
+- Example: `cocos-story-gemini-live` → parent `cocos-story`
+- Detection methods:
+  - Parse `.git` file (worktrees have a file, not a directory, pointing to main repo)
+  - Check `git worktree list` output
+  - Fall back to naming convention heuristics (prefix matching)
+- Aggregate patterns across all worktrees of a project
+- Show worktree activity grouped under main project in briefings
+- Link to correct branch/worktree in GitHub URLs
+
+**Clickable Links & Deep Links:**
+- GitHub PR links: `repo#123` → `https://github.com/owner/repo/pull/123`
+- Commit links: `abc1234` → `https://github.com/owner/repo/commit/abc1234`
+- File links: `src/auth.ts:42` → GitHub blob view at specific line
+- Branch links: direct to compare view for stale branches
+- Session references: link to local session transcript if available
+
+**Narrative Transitions (inspired by ChatGPT Pulse):**
+- Contextual intro text connecting card groups thematically
+- Example: "After yesterday's auth work, here's what needs attention today..."
+- Smooth transitions between related cards
+- Summary closings with prioritized action items
+
+**Card Grouping & Theming:**
+- Group related cards by project or theme
+- Visual distinction between card types
+- Priority indicators (urgent, normal, FYI)
+
+**HTML Email Template:**
+- Clean, responsive design for email clients
+- Syntax-highlighted code blocks
+- Collapsible sections for detailed content
+- Inline feedback buttons (thumbs up/down)
+- Dark mode support
+
+**New Card Types:**
+- Learning & Concepts with spaced repetition
+- Proactive suggestions based on patterns
+- Weekly summary roll-up
+
+### Phase 4: Advanced Features
+
+**Post-Merge PR Comments:**
+- Detect comments added to PRs after they are merged
+- Highlight these in briefings as "post-merge feedback" requiring attention
+- Particularly useful for cocos-story where reviews may come after merge
+- Link directly to the comment thread
+- Track which post-merge comments have been acknowledged
+
+**Web Interface:**
+- Configuration editor with live preview
+- Briefing history browser with search
+- Mobile-friendly responsive design
+- Calendar integration for scheduling follow-ups
+
+**Analytics:**
+- Briefing engagement metrics
+- Topic trend analysis over time
+- Feedback pattern visualization
+
+### Phase 5: Project Memory & Proactive Intelligence
+
+**Inspired by ChatGPT Pulse**, this phase goes beyond memory to provide proactive technical research, architecture suggestions, and actionable guidance tailored to your projects.
+
+#### 5.1 Memory System
+
+**Memory Files:**
+- `~/.cpulse/memory.md` - global context across all projects
+- Per-project `docs/memory.md` - auto-discovered from git repos
+- Memory contents:
+  - Tech stack and architecture decisions
+  - Team workflows and conventions (PRs to develop, AI code review)
+  - Domain terminology (genealogy, family storytelling)
+  - Known pain points and active priorities
+  - Related projects and dependencies
+
+**Memory Management:**
+- CLI: `cpulse memory [show|edit|suggest]`
+- Web interface with preview
+- Auto-suggest additions from repeated session patterns
+- Version tracking (when context was added/updated)
+
+#### 5.2 Proactive Technical Research
+
+**The key insight from ChatGPT Pulse:** Don't just summarize what happened—research and suggest what should happen next.
+
+**Tech Stack Awareness:**
+- Monitor for new versions/features in your stack (Next.js, Firebase, Gemini, etc.)
+- Surface relevant updates: "Gemini 2.5 Flash now supports streaming function call args—this could improve your interviewer service latency"
+- Alert when dependencies have security updates or breaking changes
+
+**Pattern Library:**
+- Build a library of patterns relevant to your stack
+- Suggest patterns when session activity indicates a need:
+  - Working on pagination? → Suggest cursor-safe Firestore patterns
+  - Adding scheduled jobs? → Surface Cloud Scheduler best practices
+  - Building extraction pipelines? → Recommend structured output approaches
+
+**Production Readiness:**
+- Generate checklists based on what you're building:
+  - New Firestore queries → Index requirements checklist
+  - New Cloud Functions → Retry/idempotency checklist
+  - New API endpoints → Security rules alignment check
+
+#### 5.3 Architecture Suggestions
+
+**Proactive Design Guidance (like ChatGPT Pulse Example 1):**
+- When you add new queries, suggest composite indexes needed
+- When you modify data models, flag potential migration needs
+- When you add new collections, remind about tenantId-first indexing rule
+
+**Example Card - Production Checklist:**
+```
+## Production Readiness: stories pagination
+
+You added a new query in `apps/web/lib/stories.ts`:
+`where("tenantId", "==", tid), where("personIds", "array-contains", pid), orderBy("createdAt", "desc")`
+
+**Index required:** This query needs a composite index. Add to `firestore.indexes.json`:
+{
+  "collectionGroup": "stories",
+  "fields": [
+    { "fieldPath": "tenantId", "order": "ASCENDING" },
+    { "fieldPath": "personIds", "arrayConfig": "CONTAINS" },
+    { "fieldPath": "createdAt", "order": "DESCENDING" }
+  ]
+}
+
+**Pagination check:** Your cursor uses `createdAt` alone. If collisions are possible,
+add `orderBy("__name__", "desc")` for stability.
+```
+
+#### 5.4 Implementation Patterns
+
+**Delta Caching Pattern (from ChatGPT Pulse Example 2):**
+- When building slow queries, suggest caching strategies
+- Provide skeleton/placeholder patterns for perceived performance
+- Include code examples tailored to your stack (Redis + FastAPI or Firestore)
+
+**Example Card - Performance Pattern:**
+```
+## Suggestion: Delta Caching for Person Timeline
+
+Your Person Timeline queries are averaging 2.3s. Consider delta caching:
+
+1. **Cache skeleton:** Store outline (decades, section headers) with placeholders
+2. **Instant render:** Show skeleton immediately on repeat queries
+3. **Parallel fetch:** Load fresh events/facts in background
+4. **Patch in:** Stream updates to replace placeholders
+
+Cache key: `sha256(personId + dateRange + viewType + locale)`
+TTL: 7 days or until GEDCOM import version changes
+
+This pattern fits your existing Firestore + FastAPI stack. Want a code snippet?
+```
+
+#### 5.5 Extraction Pipeline Intelligence (from ChatGPT Pulse Example 3)
+
+**For interviewer service specifically:**
+- Track Gemini/Vertex AI updates relevant to entity extraction
+- Suggest structured output improvements over prompt parsing
+- Recommend validation patterns (Zod/Pydantic) for schema enforcement
+- Alert when new function calling features could improve accuracy
+
+**Example Card - Tech Update:**
+```
+## Tech Alert: Gemini 2.5 Flash Improvements
+
+Relevant to your interviewer service extraction pipeline:
+
+**Streaming function args:** Now supported—could reduce time-to-first-token
+for entity extraction responses.
+
+**Structured outputs:** JSON Schema enforcement is now first-class. Your current
+prompt-based parsing in `extract_entities()` could be replaced with schema-driven
+extraction for higher reliability.
+
+**Recommendation:** Consider migrating from free-form extraction to:
+- Define Person/Relationship/Event schemas in Pydantic
+- Use `response_schema` parameter instead of parsing
+- Add Zod validation at the TypeScript boundary
+
+This aligns with your existing contract test pattern between Python and TypeScript.
+```
+
+#### 5.6 Cross-Project Intelligence
+
+**Pattern Transfer:**
+- "You implemented cursor pagination well in cocos-story—cpulse briefing history could use the same pattern"
+- "The retry logic in interviewer service would improve cpulse's GitHub API calls"
+
+**Dependency Awareness:**
+- "@repo/types changed → Python contract tests may need updates"
+- "Firebase SDK updated in apps/web → check services/functions compatibility"
+
+#### 5.7 New Card Types
+
+| Card Type | Purpose | Trigger |
+|-----------|---------|---------|
+| **Production Checklist** | Index, security, idempotency checks | New queries/functions detected |
+| **Tech Update** | Relevant new features in your stack | Version monitoring |
+| **Pattern Suggestion** | Design patterns for current work | Session activity analysis |
+| **Architecture Reminder** | Surface relevant past decisions | Patterns suggest drift |
+| **Convention Check** | Flag potential violations | Code changes conflict with docs |
+| **Cross-Project Insight** | Apply learnings across repos | Similar patterns detected |
+
+#### 5.8 Implementation Approach
+
+**Data Flow:**
+```
+Memory Files + Session Activity + GitHub Activity
+           ↓
+    Context Analysis
+           ↓
+   Pattern Matching (what are you building?)
+           ↓
+   Research Generation (what should you know?)
+           ↓
+   Card Generation (actionable guidance)
+```
+
+**Research Sources:**
+- Project memory files (architecture, conventions)
+- Tech stack documentation (cached/indexed)
+- Recent session patterns (what problems are you solving?)
+- GitHub activity (what's changing in the codebase?)
+
+**Prompt Strategy:**
+- Include relevant memory context
+- Describe current work patterns detected
+- Ask for specific, actionable suggestions
+- Request code examples in the user's stack
+
+### Phase 4: Feedback & Analytics
+
+- Post-merge feedback tracking
+- Web dashboard for briefing history
+- Feedback-derived priority adjustment
+- User preference persistence
+- Analytics on briefing engagement
+
+### Phase 5: Memory System
+
+- Project-aware briefings with memory files
+- Memory file discovery (docs/memory.md, memory.md, ~/.cpulse/memory.md)
+- Proactive intelligence based on project context
+- Pattern recognition across sessions
+- Memory context injection into article generation
+- Collision-safe project memory lookup
+
+### Phase 6: Intelligent Advisory
+
+- **Card configurability** - Enable/disable card types in config.yaml
+- **Tech Advisory card** (Wed/Thu) - Stack-aware architectural advice with web search trends
+- **Challenge Insights card** (Mon/Tue) - PR review pattern analysis with preventive guidance
+- **Cost Optimization card** (Friday) - GCP-focused cost saving recommendations
+- Weekly rotation for advisory cards to avoid repetition
+- Tech stack detection from package.json, requirements.txt, go.mod, etc.
+- Web search integration for current best practices (7-day cache)
+- `cpulse cards` CLI command for managing card types
+
+### Phase 7: Polish and Installation
+
+- **Email branding** - Changed email subject from "cpulse" to "Commit Pulse" for professional appearance
+- **All-cards option** - Added `--all-cards` CLI flag to generate all card types regardless of weekly rotation, useful for testing and debugging
+- **Install command** - Added `cpulse install` command to copy the application to `~/.cpulse/bin/` for runtime use separate from source
+  - `--force` flag to overwrite existing installation
+  - `--link` flag to create symlink in `/usr/local/bin` (requires sudo)
+  - Provides shell configuration instructions for PATH setup
+
+### Phase 8: Claude Code-Aware Advisory
+
+**Key insight:** The user develops exclusively with Claude Code - all coding is done by Claude Code based on user direction. Advisory cards should acknowledge this workflow and provide advice in a format useful for Claude Code.
+
+**Changes:**
+
+- **System prompt update** - Added context explaining that Claude Code does all coding
+- **Advisory cards now include CLAUDE.md rules** - Each advisory card includes a section with instructions the user can add to their CLAUDE.md to teach Claude Code the recommended pattern
+- **Tech Advisory** - Provides stack-specific tips with CLAUDE.md rules for enforcing patterns
+- **Challenge Insights** - Identifies patterns Claude Code is making and provides rules to prevent recurrence
+- **Cost Optimization** - Suggests cost-efficient patterns with CLAUDE.md rules for enforcement
+- **Card ordering by config** - Cards now appear in the order specified in `enabled_cards` in config.yaml
+
+**Output Format:**
+Advisory cards now include an "Add to CLAUDE.md" section with copy-paste instructions:
+```
+**Add to CLAUDE.md:**
+- when reading multiple Firestore documents, use batch reads (getAll) instead of individual reads
+```
+
+Rules follow the existing CLAUDE.md style (lowercase, imperative, no periods).
+
+**Card Order Configuration:**
+The order of cards in `enabled_cards` controls the output order:
+```yaml
+preferences:
+  enabled_cards:
+    post_merge_feedback: true   # appears first
+    code_review: true           # appears second
+    project_continuity: true    # appears third
+    challenge_insights: true
+    tech_advisory: true
+    open_questions: true
+    patterns: true
+    cost_optimization: true
+```
+
+**Rationale:**
+Since Claude Code follows CLAUDE.md instructions, the most effective way to change coding practices is to update those instructions. This phase shifts advisory cards from "you should do X" to "tell Claude Code to do X" with ready-to-use rules.
 
 ---
 
@@ -322,6 +660,7 @@ Items explicitly deferred for potential future implementation:
 - **Claude.ai conversation integration** - Add as data source when official API becomes available
 - **Multi-machine sync** - Aggregate Claude Code logs across machines if workflow requires it
 - **On-demand briefings** - Trigger briefings outside the daily schedule
+- **Memory learning** - Auto-extract and suggest memory entries from session patterns
 
 ---
 

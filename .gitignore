@@ -10,7 +10,7 @@ __pycache__/
 .Python
 build/
 develop-eggs/
-dist/
+# dist/ - NOT ignored, contains our source code
 downloads/
 eggs/
 .eggs/

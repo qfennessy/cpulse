@@ -1,15 +1,15 @@
-# cpulse Design Document
+# Commit Pulse Design Document
 
 **Created:** 2026-01-12
-**Last Updated:** 2026-01-12
+**Last Updated:** 2026-01-13
 
-**Status:** Design approved
+**Status:** Phase 6 implementation complete
 
 ---
 
 ## Overview
 
-cpulse is a personal briefing system that generates thoughtful, actionable articles based on your interactions with Claude, Claude Code sessions, and GitHub activity. Like ChatGPT Pulse, it synthesizes your activity overnight and delivers personalized insights via email each morning.
+Commit Pulse (cpulse) is a personal briefing system that generates thoughtful, actionable articles based on your interactions with Claude, Claude Code sessions, and GitHub activity. Like ChatGPT Pulse, it synthesizes your activity overnight and delivers personalized insights via email each morning.
 
 The briefings are presented in Claude Code's communication style: concise, direct, technically accurate, and formatted in clean markdown.
 
@@ -172,7 +172,7 @@ generate a "Project Continuity" card that:
 ```
 
 ```
-Given the user's last 10 GitHub commits to the cpulse repository,
+Given the user's last 10 GitHub commits to the Commit Pulse repository,
 generate a "Code Review Digest" that:
 - Groups commits by feature/intent
 - Flags any commits without corresponding tests
@@ -238,7 +238,7 @@ The email is rendered as clean HTML that degrades gracefully to plain text. Each
 Example card:
 
 ```
-## Project Continuity: cpulse Authentication
+## Project Continuity: Commit Pulse Authentication
 
 Yesterday you worked on JWT token validation in `src/auth/validate.ts`.
 The session ended with two failing tests in `auth.test.ts`:
@@ -312,6 +312,34 @@ Next steps:
 - Proactive suggestions
 - Web interface for configuration and history
 - Briefing search and analytics
+
+### Phase 4: Feedback & Analytics
+
+- Post-merge feedback tracking
+- Web dashboard for briefing history
+- Feedback-derived priority adjustment
+- User preference persistence
+- Analytics on briefing engagement
+
+### Phase 5: Memory System
+
+- Project-aware briefings with memory files
+- Memory file discovery (docs/memory.md, memory.md, ~/.cpulse/memory.md)
+- Proactive intelligence based on project context
+- Pattern recognition across sessions
+- Memory context injection into article generation
+- Collision-safe project memory lookup
+
+### Phase 6: Intelligent Advisory
+
+- **Card configurability** - Enable/disable card types in config.yaml
+- **Tech Advisory card** (Wed/Thu) - Stack-aware architectural advice with web search trends
+- **Challenge Insights card** (Mon/Tue) - PR review pattern analysis with preventive guidance
+- **Cost Optimization card** (Friday) - GCP-focused cost saving recommendations
+- Weekly rotation for advisory cards to avoid repetition
+- Tech stack detection from package.json, requirements.txt, go.mod, etc.
+- Web search integration for current best practices (7-day cache)
+- `cpulse cards` CLI command for managing card types
 
 ---
 

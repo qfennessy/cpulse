@@ -144,10 +144,10 @@ export async function getOpenPullRequests(
     });
 
     for (const pr of myPRs.items) {
-      // Skip if already added
-      if (pullRequests.some((p) => p.number === pr.number)) continue;
-
       const repoFullName = pr.repository_url.split('/').slice(-2).join('/');
+
+      // Skip if already added (check both PR number AND repo to avoid false matches)
+      if (pullRequests.some((p) => p.number === pr.number && p.repo === repoFullName)) continue;
       pullRequests.push({
         number: pr.number,
         title: pr.title,

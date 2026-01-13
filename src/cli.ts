@@ -15,6 +15,15 @@ import {
 
 const program = new Command();
 
+function parseHours(value: string): number {
+  const hours = parseInt(value, 10);
+  if (isNaN(hours) || hours <= 0) {
+    console.error(`Error: --hours must be a positive number, got "${value}"`);
+    process.exit(1);
+  }
+  return hours;
+}
+
 program
   .name('cpulse')
   .description('Personal daily briefings from Claude Code sessions and GitHub activity')
@@ -44,6 +53,8 @@ program
   .option('--preview', 'Print briefing to stdout instead of sending')
   .action(async (options) => {
     try {
+      // Validate hours before loading config to fail fast
+      const hoursBack = parseHours(options.hours);
       const config = loadConfig();
 
       if (options.preview) {
@@ -53,7 +64,7 @@ program
       const briefing = await generateAndSendBriefing(config, {
         send: options.send,
         save: options.save,
-        hoursBack: parseInt(options.hours, 10),
+        hoursBack,
       });
 
       if (options.preview || !options.send) {
@@ -75,8 +86,10 @@ program
   .option('--hours <hours>', 'Hours of history to analyze', '24')
   .action(async (options) => {
     try {
+      // Validate hours before loading config to fail fast
+      const hoursBack = parseHours(options.hours);
       const config = loadConfig();
-      const signals = await collectSignals(config, parseInt(options.hours, 10));
+      const signals = await collectSignals(config, hoursBack);
 
       console.log('\n=== Claude Code Sessions ===');
       console.log(`Sessions: ${signals.claudeCode.recentSessions.length}`);

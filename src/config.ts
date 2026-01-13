@@ -106,8 +106,10 @@ export function loadConfig(): Config {
   if (process.env.ANTHROPIC_API_KEY) {
     config.anthropic_api_key = process.env.ANTHROPIC_API_KEY;
   }
-  if (process.env.GITHUB_TOKEN) {
-    config.sources.github.token = process.env.GITHUB_TOKEN;
+  // Support both GITHUB_PERSONAL_ACCESS_TOKEN (preferred) and GITHUB_TOKEN
+  const githubToken = process.env.GITHUB_PERSONAL_ACCESS_TOKEN || process.env.GITHUB_TOKEN;
+  if (githubToken) {
+    config.sources.github.token = githubToken;
   }
 
   config.data_dir = DATA_DIR;

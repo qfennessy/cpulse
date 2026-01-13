@@ -4,6 +4,10 @@ Personal daily briefings from your Claude Code sessions and GitHub activity.
 
 Commit Pulse analyzes your development activity over the past week and generates concise, actionable briefings delivered to your email each morning.
 
+## Inspiration
+
+This was inspired by ChatGPT Pulse. As of 13 Jan 2026, Pulse is only available to ChatGPT Pro subscribers ($200/month)
+
 ## Features
 
 - **Claude Code Integration**: Parses your Claude Code session logs to identify projects worked on, open todos, and unresolved errors

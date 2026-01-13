@@ -82,32 +82,32 @@ export function renderCardHtml(card: ArticleCard, index: number, briefingId: str
   const contentHtml = markdownToEmailHtml(card.content);
 
   return `
-    <div style="background:#ffffff;border-radius:12px;padding:24px;margin:16px 0;box-shadow:0 1px 3px rgba(0,0,0,0.1);">
+    <div class="card-container" style="background:#ffffff;border-radius:12px;padding:24px;margin:16px 0;box-shadow:0 1px 3px rgba(0,0,0,0.1);">
       <!-- Card header -->
       <div style="display:flex;align-items:center;margin-bottom:16px;">
-        <span style="display:inline-block;background:${style.color}15;color:${style.color};padding:4px 10px;border-radius:6px;font-size:12px;font-weight:600;text-transform:uppercase;">
+        <span class="card-label" style="display:inline-block;background:${style.color}22;color:${style.color};padding:4px 10px;border-radius:6px;font-size:12px;font-weight:600;text-transform:uppercase;">
           ${style.label}
         </span>
       </div>
 
       <!-- Card title -->
-      <h2 style="margin:0 0 16px;font-size:20px;font-weight:600;color:#111827;">
+      <h2 class="title" style="margin:0 0 16px;font-size:20px;font-weight:600;color:#111827;">
         ${escapeHtml(card.title)}
       </h2>
 
       <!-- Card content -->
-      <div style="color:#374151;font-size:15px;line-height:1.6;">
+      <div class="content" style="color:#374151;font-size:15px;line-height:1.6;">
         ${contentHtml}
       </div>
 
       <!-- Feedback buttons -->
-      <div style="margin-top:20px;padding-top:16px;border-top:1px solid #e5e7eb;">
-        <span style="color:#6b7280;font-size:13px;margin-right:12px;">Was this helpful?</span>
-        <a href="mailto:?subject=cpulse feedback&body=Briefing: ${briefingId}%0ACard: ${index}%0ARating: helpful" style="display:inline-block;padding:6px 12px;margin-right:8px;background:#f3f4f6;border-radius:6px;color:#374151;text-decoration:none;font-size:13px;">
-          &#128077; Yes
+      <div class="card-divider" style="margin-top:20px;padding-top:16px;border-top:1px solid #e5e7eb;">
+        <span class="muted" style="color:#6b7280;font-size:13px;margin-right:12px;">Was this helpful?</span>
+        <a class="feedback-btn" href="mailto:?subject=cpulse feedback&body=Briefing: ${briefingId}%0ACard: ${index}%0ARating: helpful" style="display:inline-block;padding:6px 12px;margin-right:8px;background:#f3f4f6;border-radius:6px;color:#374151;text-decoration:none;font-size:13px;">
+          Yes
         </a>
-        <a href="mailto:?subject=cpulse feedback&body=Briefing: ${briefingId}%0ACard: ${index}%0ARating: not_helpful" style="display:inline-block;padding:6px 12px;background:#f3f4f6;border-radius:6px;color:#374151;text-decoration:none;font-size:13px;">
-          &#128078; No
+        <a class="feedback-btn" href="mailto:?subject=cpulse feedback&body=Briefing: ${briefingId}%0ACard: ${index}%0ARating: not_helpful" style="display:inline-block;padding:6px 12px;background:#f3f4f6;border-radius:6px;color:#374151;text-decoration:none;font-size:13px;">
+          No
         </a>
       </div>
     </div>
@@ -131,7 +131,7 @@ function escapeHtml(text: string): string {
  */
 export function renderTransitionHtml(text: string): string {
   return `
-    <div style="padding:12px 24px;color:#6b7280;font-style:italic;font-size:15px;">
+    <div class="muted" style="padding:12px 24px;color:#6b7280;font-style:italic;font-size:15px;">
       ${escapeHtml(text)}
     </div>
   `;
@@ -172,45 +172,55 @@ export function renderBriefingHtml(
   <meta name="supported-color-schemes" content="light dark">
   <title>cpulse Daily Briefing - ${date}</title>
   <style>
-    /* Dark mode support */
+    /* Dark mode support - must use !important to override inline styles */
     @media (prefers-color-scheme: dark) {
-      body {
-        background-color: #111827 !important;
+      body, .body-bg {
+        background-color: #0f172a !important;
       }
-      .email-container {
-        background-color: #1f2937 !important;
+      .container, .card-container, div[style*="background:#ffffff"], div[style*="background: #ffffff"] {
+        background-color: #1e293b !important;
       }
-      .card {
-        background-color: #374151 !important;
+      h1, h2, h3, .title {
+        color: #f8fafc !important;
       }
-      h1, h2, h3, p, li {
-        color: #f3f4f6 !important;
+      p, li, span, div, .content, .text {
+        color: #e2e8f0 !important;
       }
-      .muted {
-        color: #9ca3af !important;
+      .muted, .date, .footer {
+        color: #94a3b8 !important;
+      }
+      a {
+        color: #60a5fa !important;
       }
       code {
-        background-color: #4b5563 !important;
-        color: #f3f4f6 !important;
+        background-color: #334155 !important;
+        color: #e2e8f0 !important;
+      }
+      .feedback-btn {
+        background-color: #334155 !important;
+        color: #e2e8f0 !important;
+      }
+      .card-divider {
+        border-color: #334155 !important;
       }
     }
   </style>
 </head>
-<body style="margin:0;padding:0;background:#f3f4f6;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;">
-  <div style="max-width:640px;margin:0 auto;padding:24px;">
+<body class="body-bg" style="margin:0;padding:0;background:#f3f4f6;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;">
+  <div class="container" style="max-width:640px;margin:0 auto;padding:24px;">
     <!-- Header -->
     <div style="text-align:center;padding:24px 0;">
-      <h1 style="margin:0 0 8px;font-size:28px;font-weight:700;color:#111827;">
+      <h1 class="title" style="margin:0 0 8px;font-size:28px;font-weight:700;color:#111827;">
         cpulse
       </h1>
-      <p style="margin:0;color:#6b7280;font-size:14px;">
+      <p class="date muted" style="margin:0;color:#6b7280;font-size:14px;">
         ${date}
       </p>
     </div>
 
     <!-- Opening narrative -->
-    <div style="background:#ffffff;border-radius:12px;padding:24px;margin-bottom:8px;">
-      <div style="color:#374151;font-size:16px;line-height:1.6;">
+    <div class="card-container" style="background:#ffffff;border-radius:12px;padding:24px;margin-bottom:8px;">
+      <div class="content" style="color:#374151;font-size:16px;line-height:1.6;">
         ${markdownToEmailHtml(opening)}
       </div>
     </div>
@@ -219,14 +229,14 @@ export function renderBriefingHtml(
     ${cardsHtml}
 
     <!-- Closing narrative -->
-    <div style="background:#ffffff;border-radius:12px;padding:24px;margin-top:8px;">
-      <div style="color:#374151;font-size:15px;line-height:1.6;">
+    <div class="card-container" style="background:#ffffff;border-radius:12px;padding:24px;margin-top:8px;">
+      <div class="content" style="color:#374151;font-size:15px;line-height:1.6;">
         ${markdownToEmailHtml(closing)}
       </div>
     </div>
 
     <!-- Footer -->
-    <div style="text-align:center;padding:24px 0;color:#9ca3af;font-size:12px;">
+    <div class="footer" style="text-align:center;padding:24px 0;color:#9ca3af;font-size:12px;">
       <p style="margin:0;">
         Generated by <a href="https://github.com/qfennessy/cpulse" style="color:#6b7280;">cpulse</a>
       </p>

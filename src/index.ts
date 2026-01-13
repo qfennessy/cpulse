@@ -12,7 +12,7 @@ import { saveBriefing, getLatestBriefing } from './storage/briefings.js';
 
 export async function collectSignals(
   config: Config,
-  hoursBack: number = 24
+  hoursBack: number = 168
 ): Promise<ExtractedSignals> {
   const signals: ExtractedSignals = {
     claudeCode: {
@@ -49,7 +49,7 @@ export async function generateAndSendBriefing(
   config: Config,
   options: { send?: boolean; save?: boolean; hoursBack?: number } = {}
 ): Promise<Briefing> {
-  const { send = true, save = true, hoursBack = 24 } = options;
+  const { send = true, save = true, hoursBack = 168 } = options;
 
   // Collect signals
   const signals = await collectSignals(config, hoursBack);

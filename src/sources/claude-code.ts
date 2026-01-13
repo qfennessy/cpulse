@@ -247,7 +247,7 @@ export function parseSession(filePath: string): ClaudeCodeSession | null {
 
 export function getRecentSessions(
   config: ClaudeCodeSourceConfig,
-  hoursBack: number = 24
+  hoursBack: number = 168
 ): ClaudeCodeSession[] {
   const since = new Date(Date.now() - hoursBack * 60 * 60 * 1000);
   const sessionInfos = listSessions(config, since);

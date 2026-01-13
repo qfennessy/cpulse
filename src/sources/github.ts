@@ -23,7 +23,7 @@ export async function createGitHubClient(
 export async function getRecentCommits(
   octokit: Octokit,
   config: GitHubSourceConfig,
-  hoursBack: number = 24
+  hoursBack: number = 168
 ): Promise<GitHubCommit[]> {
   const since = new Date(Date.now() - hoursBack * 60 * 60 * 1000).toISOString();
   const commits: GitHubCommit[] = [];
@@ -235,7 +235,7 @@ export async function getStaleBranches(
 
 export async function getGitHubActivity(
   config: GitHubSourceConfig,
-  hoursBack: number = 24
+  hoursBack: number = 168
 ): Promise<GitHubActivity> {
   if (!config.enabled) {
     return { commits: [], pullRequests: [], staleBranches: [] };

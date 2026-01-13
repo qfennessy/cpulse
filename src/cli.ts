@@ -49,7 +49,7 @@ program
   .description('Generate and send a daily briefing')
   .option('--no-send', 'Generate but do not send email')
   .option('--no-save', 'Generate but do not save to history')
-  .option('--hours <hours>', 'Hours of history to analyze', '24')
+  .option('--hours <hours>', 'Hours of history to analyze', '168')
   .option('--preview', 'Print briefing to stdout instead of sending')
   .action(async (options) => {
     try {
@@ -83,7 +83,7 @@ program
 program
   .command('preview')
   .description('Preview signals that would be used for briefing')
-  .option('--hours <hours>', 'Hours of history to analyze', '24')
+  .option('--hours <hours>', 'Hours of history to analyze', '168')
   .action(async (options) => {
     try {
       // Validate hours before loading config to fail fast

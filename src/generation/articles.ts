@@ -112,7 +112,7 @@ export async function generateProjectContinuityCard(
 
   const prompt = `Based on these recent Claude Code sessions, generate a "Project Continuity" briefing card.
 
-Sessions from the last 24 hours:
+Sessions from the last 7 days:
 ${sessionSummaries}
 ${todosText}
 
@@ -175,7 +175,7 @@ export async function generateCodeReviewCard(
 
   const prompt = `Based on this GitHub activity, generate a "Code Review" briefing card.
 
-Recent commits (last 24 hours):
+Recent commits (last 7 days):
 ${commitsSummary}
 
 Open Pull Requests:

@@ -23,6 +23,10 @@ import {
   updateTopicPriority,
   groupByParentProject,
   createWebServer,
+  loadGlobalMemory,
+  loadProjectMemory,
+  getMemorySummary,
+  loadMemoryContext,
 } from './index.js';
 import type { BriefingFeedback } from './types/index.js';
 
@@ -464,6 +468,87 @@ program
       console.log(`\nPress Ctrl+C to stop the server`);
     } catch (error) {
       console.error('Error starting server:', error);
+      process.exit(1);
+    }
+  });
+
+program
+  .command('memory')
+  .description('Show memory context status and loaded project memories')
+  .option('--project <path>', 'Show memory for a specific project path')
+  .action(async (options) => {
+    try {
+      console.log('\n=== Memory Context ===\n');
+
+      // Show global memory
+      const globalMemory = loadGlobalMemory();
+      if (globalMemory) {
+        console.log('Global memory: ~/.cpulse/memory.md');
+        console.log(`  Sections: ${globalMemory.sections.length}`);
+        console.log(`  Last modified: ${globalMemory.lastModified.toLocaleString()}`);
+        if (globalMemory.sections.length > 0) {
+          console.log('  Section titles:');
+          for (const section of globalMemory.sections.slice(0, 5)) {
+            console.log(`    - ${section.title}`);
+          }
+          if (globalMemory.sections.length > 5) {
+            console.log(`    ... and ${globalMemory.sections.length - 5} more`);
+          }
+        }
+      } else {
+        console.log('Global memory: not found');
+        console.log('  Create ~/.cpulse/memory.md to add global context');
+      }
+
+      console.log('');
+
+      // Show project memory if path provided
+      if (options.project) {
+        const projectMemory = loadProjectMemory(options.project);
+        if (projectMemory) {
+          console.log(`Project memory: ${projectMemory.projectName}`);
+          console.log(`  Path: ${projectMemory.projectPath}`);
+          console.log(`  Sections: ${projectMemory.sections.length}`);
+          console.log(`  Last modified: ${projectMemory.lastModified.toLocaleString()}`);
+          if (projectMemory.sections.length > 0) {
+            console.log('  Section titles:');
+            for (const section of projectMemory.sections) {
+              console.log(`    - ${section.title}`);
+            }
+          }
+        } else {
+          console.log(`Project memory: not found for ${options.project}`);
+          console.log('  Create docs/memory.md or memory.md in your project root');
+        }
+      } else {
+        // Show memory from current directory
+        const cwd = process.cwd();
+        const projectMemory = loadProjectMemory(cwd);
+        if (projectMemory) {
+          console.log(`Current project memory: ${projectMemory.projectName}`);
+          console.log(`  Path: ${projectMemory.projectPath}`);
+          console.log(`  Sections: ${projectMemory.sections.length}`);
+          if (projectMemory.sections.length > 0) {
+            console.log('  Section titles:');
+            for (const section of projectMemory.sections) {
+              console.log(`    - ${section.title}`);
+            }
+          }
+        } else {
+          console.log('Current project memory: not found');
+          console.log('  Create docs/memory.md or memory.md in your project root');
+        }
+      }
+
+      console.log('\n--- Memory Integration ---');
+      console.log('Memory files are automatically loaded when generating briefings.');
+      console.log('They provide project-specific context to make insights more relevant.');
+      console.log('\nSupported locations:');
+      console.log('  - ~/.cpulse/memory.md (global context)');
+      console.log('  - <project>/docs/memory.md (preferred)');
+      console.log('  - <project>/memory.md (fallback)');
+    } catch (error) {
+      console.error('Error:', error);
       process.exit(1);
     }
   });

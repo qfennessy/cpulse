@@ -2,6 +2,13 @@
 node_modules/
 .claude/
 
+# Memory files (personal project context - not for version control)
+memory.md
+**/memory.md
+
+# Personal reference docs
+docs/chatgpt-pulse-example-*.md
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]

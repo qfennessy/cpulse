@@ -8,6 +8,7 @@ memory.md
 
 # Personal reference docs
 docs/chatgpt-pulse-example-*.md
+docs/how-chatgpt-pulse-works-w-examples.md
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

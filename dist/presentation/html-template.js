@@ -23,24 +23,11 @@ const ACCENT_COLOR = '#c4402f';
  */
 export function markdownToEmailHtml(markdown) {
     let html = markdown;
-
-    // Handle fenced code blocks FIRST (before escaping)
-    // These get special treatment for clean copy/paste
-    const codeBlocks = [];
-    html = html.replace(/```(\w*)\n([\s\S]*?)```/g, (_match, lang, code) => {
-        const index = codeBlocks.length;
-        // Trim trailing newline but preserve internal formatting
-        const cleanCode = code.replace(/\n$/, '');
-        codeBlocks.push({ lang, code: cleanCode });
-        return `__CODEBLOCK_${index}__`;
-    });
-
-    // Escape HTML (but not the code block placeholders)
+    // Escape HTML first
     html = html.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-
-    // Bold: **text** or __text__ (but not our CODEBLOCK placeholders)
+    // Bold: **text** or __text__
     html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
-    html = html.replace(/__(?!CODEBLOCK_)(.+?)__/g, '<strong>$1</strong>');
+    html = html.replace(/__(.+?)__/g, '<strong>$1</strong>');
     // Italic: *text* or _text_
     html = html.replace(/(?<!\*)\*([^*]+?)\*(?!\*)/g, '<em>$1</em>');
     html = html.replace(/(?<!_)_([^_]+?)_(?!_)/g, '<em>$1</em>');
@@ -55,53 +42,43 @@ export function markdownToEmailHtml(markdown) {
     html = html.replace(/^### (.+)$/gm, '<h3 style="margin:20px 0 10px;font-size:14px;font-weight:600;color:#666;text-transform:uppercase;letter-spacing:0.5px;">$1</h3>');
     html = html.replace(/^## (.+)$/gm, '<h2 style="margin:24px 0 12px;font-size:18px;font-weight:600;color:#1a1a1a;">$1</h2>');
     html = html.replace(/^# (.+)$/gm, '<h1 style="margin:28px 0 16px;font-size:22px;font-weight:700;color:#1a1a1a;">$1</h1>');
-    // Convert list items with distinct markers (tight spacing for better readability)
-    html = html.replace(/^\d+\. (.+)$/gm, '<li data-ol style="margin:0;padding:1px 0;color:#333;">$1</li>');
-    html = html.replace(/^- (.+)$/gm, '<li data-ul style="margin:0;padding:1px 0;color:#333;">$1</li>');
-    // Wrap each list type separately (tight margins, no extra spacing)
-    html = html.replace(/(<li data-ol[^>]*>.*<\/li>\n?)+/g, '<ol style="margin:8px 0;padding-left:24px;line-height:1.4;">$&</ol>');
-    html = html.replace(/(<li data-ul[^>]*>.*<\/li>\n?)+/g, '<ul style="margin:8px 0;padding-left:24px;line-height:1.4;">$&</ul>');
-    // Clean up data attributes
-    html = html.replace(/ data-ol| data-ul/g, '');
-    // Remove any newlines between list items (they cause extra <br> later)
-    html = html.replace(/<\/li>\n+<li/g, '</li><li');
+    // Process lists first - extract, clean, and isolate them from paragraph processing
+    // Step 1: Convert list items to <li> tags with markers
+    html = html.replace(/^\d+\. (.+)$/gm, '%%%OL_ITEM%%%<li style="margin:8px 0;color:#333;">$1</li>');
+    html = html.replace(/^- (.+)$/gm, '%%%UL_ITEM%%%<li style="margin:8px 0;color:#333;">$1</li>');
+    // Step 2: Group consecutive list items and wrap in <ul>/<ol>
+    // Use markers to identify list type, collapse whitespace between items
+    html = html.replace(/(%%%OL_ITEM%%%<li[^>]*>.*?<\/li>[\s\n]*)+/g, (match) => {
+        const items = match.replace(/%%%OL_ITEM%%%/g, '').replace(/<\/li>[\s\n]+<li/g, '</li><li');
+        return `<ol style="margin:16px 0;padding-left:24px;">${items.trim()}</ol>\n\n`;
+    });
+    html = html.replace(/(%%%UL_ITEM%%%<li[^>]*>.*?<\/li>[\s\n]*)+/g, (match) => {
+        const items = match.replace(/%%%UL_ITEM%%%/g, '').replace(/<\/li>[\s\n]+<li/g, '</li><li');
+        return `<ul style="margin:16px 0;padding-left:24px;">${items.trim()}</ul>\n\n`;
+    });
+    // Step 3: Protect lists from paragraph processing with placeholders
+    const lists = [];
+    html = html.replace(/<[uo]l[^>]*>[\s\S]*?<\/[uo]l>/g, (match) => {
+        lists.push(match);
+        return `%%%LIST_${lists.length - 1}%%%`;
+    });
     // Paragraphs (double newlines)
     html = html.replace(/\n\n/g, '</p><p style="margin:16px 0;line-height:1.7;color:#333;">');
     // Single newlines to <br>
     html = html.replace(/\n/g, '<br>');
     // Wrap in paragraph
     html = `<p style="margin:16px 0;line-height:1.7;color:#333;">${html}</p>`;
+    // Restore lists
+    html = html.replace(/%%%LIST_(\d+)%%%/g, (_, index) => lists[parseInt(index, 10)]);
     // Clean up empty paragraphs
     html = html.replace(/<p[^>]*><\/p>/g, '');
     html = html.replace(/<p[^>]*><br><\/p>/g, '');
-
-    // Restore code blocks with styled rendering
-    // Box style: light background, left border accent, monospace font
-    // Uses <pre> to preserve whitespace for clean copy/paste
-    for (let i = 0; i < codeBlocks.length; i++) {
-        const { lang, code } = codeBlocks[i];
-        // Escape HTML in the code content
-        const escapedCode = code
-            .replace(/&/g, '&amp;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;');
-        // Keep actual newlines for clean copy/paste (pre tag preserves them)
-        // Language label if provided
-        const langLabel = lang ? `<div style="font-size:11px;color:#666;margin-bottom:8px;text-transform:uppercase;letter-spacing:0.5px;">${lang}</div>` : '';
-        // Styled code block - distinct box with left border accent
-        const codeBlockHtml = `</p>
-<div style="margin:16px 0;padding:16px;background:#f8f9fa;border-left:4px solid ${ACCENT_COLOR};border-radius:4px;overflow-x:auto;">
-${langLabel}<pre style="margin:0;font-family:'SF Mono',Monaco,'Cascadia Code',Consolas,monospace;font-size:13px;line-height:1.5;color:#1a1a1a;white-space:pre-wrap;word-wrap:break-word;">${escapedCode}</pre>
-</div>
-<p style="margin:16px 0;line-height:1.7;color:#333;">`;
-        html = html.replace(`__CODEBLOCK_${i}__`, codeBlockHtml);
-    }
-
-    // Clean up any artifacts from code block insertion
-    html = html.replace(/<p[^>]*>\s*<\/p>/g, '');
-    html = html.replace(/<br>\s*<\/p>\s*<div/g, '</p><div');
-    html = html.replace(/<\/div>\s*<p[^>]*>\s*<br>/g, '</div><p style="margin:16px 0;line-height:1.7;color:#333;">');
-
+    // Fix invalid HTML structure around lists (paragraphs shouldn't wrap lists)
+    html = html.replace(/<p[^>]*>(<[uo]l)/g, '$1'); // Remove <p> directly before list start
+    html = html.replace(/(<br>)(<[uo]l)/g, '</p>$2'); // Close paragraph before list if there's preceding content
+    html = html.replace(/(<\/[uo]l>)<\/p>(<p)/g, '$1$2'); // Keep <p> that starts next paragraph
+    html = html.replace(/(<\/[uo]l>)<\/p>/g, '$1'); // Remove orphaned </p> after list end
+    html = html.replace(/(<\/[uo]l>)(<br>)+/g, '$1'); // Remove <br> after list end
     return html;
 }
 /**
@@ -132,10 +109,10 @@ export function renderCardHtml(card, index, briefingId) {
       <!-- Feedback buttons -->
       <div style="margin-top:24px;display:flex;align-items:center;gap:12px;">
         <span style="color:#999;font-size:13px;">Was this helpful?</span>
-        <a href="mailto:?subject=Commit Pulse feedback&body=Briefing: ${briefingId}%0ACard: ${index}%0ARating: helpful" style="display:inline-flex;align-items:center;padding:8px 16px;background:#f5f5f5;border-radius:6px;color:#333;text-decoration:none;font-size:13px;font-weight:500;">
+        <a href="mailto:?subject=cpulse feedback&body=Briefing: ${briefingId}%0ACard: ${index}%0ARating: helpful" style="display:inline-flex;align-items:center;padding:8px 16px;background:#f5f5f5;border-radius:6px;color:#333;text-decoration:none;font-size:13px;font-weight:500;">
           &#10003; Yes
         </a>
-        <a href="mailto:?subject=Commit Pulse feedback&body=Briefing: ${briefingId}%0ACard: ${index}%0ARating: not_helpful" style="display:inline-flex;align-items:center;padding:8px 16px;background:#f5f5f5;border-radius:6px;color:#333;text-decoration:none;font-size:13px;font-weight:500;">
+        <a href="mailto:?subject=cpulse feedback&body=Briefing: ${briefingId}%0ACard: ${index}%0ARating: not_helpful" style="display:inline-flex;align-items:center;padding:8px 16px;background:#f5f5f5;border-radius:6px;color:#333;text-decoration:none;font-size:13px;font-weight:500;">
           &#10005; No
         </a>
       </div>

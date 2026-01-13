@@ -13,9 +13,17 @@ This was inspired by ChatGPT Pulse. As of 13 Jan 2026, Pulse is only available t
 - **Claude Code Integration**: Parses your Claude Code session logs to identify projects worked on, open todos, and unresolved errors
 - **GitHub Integration**: Summarizes commits, open PRs, review requests, and stale branches
 - **AI-Powered Summaries**: Uses Claude to synthesize activity into actionable insights
-- **Advisory Cards**: Stack-aware technical advice, challenge insights, and cost optimization tips
+- **Actionable Closing**: Every briefing ends with specific "Start Here" actions, priority items, and quick wins
+- **Smart Prioritization**: Automatically detects blockers, recurring todos, and urgent items
+- **PR Urgency Tracking**: Highlights stale PRs and how long review requests have been waiting
+- **Post-Merge Severity**: Classifies feedback on merged PRs as critical, suggestion, or question
+- **Memory System**: Project-specific context via memory.md files
 - **Email Delivery**: Sends styled HTML briefings via SMTP (works with Gmail, Fastmail, etc.)
+- **Terminal Preview**: ANSI-formatted briefings for terminal viewing
+- **Web Dashboard**: Local web UI to browse briefing history and analytics
 - **Indefinite History**: Stores all briefings locally for future reference
+
+See [docs/FEATURES.md](docs/FEATURES.md) for detailed feature documentation.
 
 ## Requirements
 
@@ -26,30 +34,28 @@ This was inspired by ChatGPT Pulse. As of 13 Jan 2026, Pulse is only available t
 
 ## Installation
 
-### Option 1: Clone and Install Globally
+### Install Globally
 
 ```bash
 git clone https://github.com/qfennessy/cpulse.git
 cd cpulse
 npm install
-
-# Install to ~/.cpulse/bin/ for global use
-node dist/cli.js install
+npm run link
 ```
 
-After installation, add to your shell config (~/.zshrc or ~/.bashrc):
+This builds the project, creates a global `cpulse` command via npm link, and installs the man page to `/usr/local/share/man/man1/`.
+
+After installation:
+- Run `cpulse --help` from anywhere
+- Run `man cpulse` for documentation
+
+To uninstall:
 
 ```bash
-# Alias for cpulse command
-alias cpulse='node ~/.cpulse/bin/cli.js'
-
-# Man page access
-export MANPATH="$HOME/.cpulse/man:$MANPATH"
+npm run unlink
 ```
 
-Then you can use `man cpulse` for documentation.
-
-### Option 2: Run from Source
+### Run from Source (Development)
 
 ```bash
 git clone https://github.com/qfennessy/cpulse.git
@@ -100,9 +106,6 @@ preferences:
     open_questions: true
     patterns: true
     post_merge_feedback: true
-    tech_advisory: true
-    challenge_insights: true
-    cost_optimization: true
 ```
 
 3. Set permissions:
@@ -154,17 +157,6 @@ cpulse config
 | `--no-send` | Generate but don't send email |
 | `--no-save` | Generate but don't save to history |
 
-### Manage Card Types
-
-```bash
-# List all card types and their schedules
-cpulse cards
-
-# See help for enabling/disabling cards
-cpulse cards enable <card-type>
-cpulse cards disable <card-type>
-```
-
 ### Other Commands
 
 ```bash
@@ -193,23 +185,6 @@ cpulse memory
 cpulse serve --port 3000
 ```
 
-## Installation Command
-
-Install cpulse to `~/.cpulse/bin/` for use outside the source directory:
-
-```bash
-# Install or update (only copies changed files)
-cpulse install
-
-# Force reinstall of npm dependencies
-cpulse install --force
-
-# Also symlink to /usr/local/bin and /usr/local/share/man (requires sudo)
-sudo cpulse install --link
-```
-
-The install command uses incremental updates - only changed files are copied, and npm dependencies are only reinstalled when package.json changes or `--force` is used.
-
 ## Scheduling
 
 To receive daily briefings, add a cron job:
@@ -221,14 +196,12 @@ crontab -e
 Add:
 
 ```
-0 6 * * * node ~/.cpulse/bin/cli.js generate >> ~/.cpulse/cron.log 2>&1
+0 6 * * * cpulse generate >> ~/.cpulse/cron.log 2>&1
 ```
 
 ## Card Types
 
 Commit Pulse generates several types of briefing cards:
-
-### Daily Cards
 
 | Card | Description |
 |------|-------------|
@@ -238,15 +211,7 @@ Commit Pulse generates several types of briefing cards:
 | **Patterns** | Development patterns and habits from your sessions |
 | **Post-Merge Feedback** | Comments added to PRs after they were merged |
 
-### Weekly Advisory Cards
-
-| Card | Schedule | Description |
-|------|----------|-------------|
-| **Challenge Insights** | Mon/Tue | PR review patterns analysis with preventive guidance |
-| **Tech Advisory** | Wed/Thu | Stack-aware architectural advice with code examples |
-| **Cost Optimization** | Friday | GCP-focused cost saving recommendations |
-
-Use `--all-cards` to generate all card types regardless of the day.
+Use `--all-cards` to generate all card types regardless of weekly rotation.
 
 ## Privacy
 
@@ -254,6 +219,12 @@ Use `--all-cards` to generate all card types regardless of the day.
 - Only extracted signals are sent to Claude API, not full conversation logs
 - GitHub token is stored locally or in environment variables
 - You can audit what's sent by running `cpulse preview`
+
+## Links
+
+- Repository: https://github.com/qfennessy/cpulse
+- Issues: https://github.com/qfennessy/cpulse/issues
+- Documentation: [docs/FEATURES.md](docs/FEATURES.md)
 
 ## License
 

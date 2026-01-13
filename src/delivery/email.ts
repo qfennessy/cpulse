@@ -6,6 +6,8 @@ import {
   wrapWithNarratives,
   renderBriefingHtml,
   renderBriefingPlainText,
+  renderBriefingTerminal,
+  formatMarkdownForTerminal,
 } from '../presentation/index.js';
 
 function formatBriefingAsMarkdown(briefing: Briefing): string {
@@ -195,8 +197,13 @@ export async function sendBriefingEmail(
   let html: string;
 
   if (signals) {
-    // Use enhanced presentation with narratives
-    const { opening, cardTransitions, closing } = wrapWithNarratives(briefing.cards, signals);
+    // Use enhanced presentation with narratives and action items
+    const { opening, cardTransitions, closing } = wrapWithNarratives(
+      briefing.cards,
+      signals,
+      signals.actionItems,
+      signals.quickWins
+    );
     html = renderBriefingHtml(briefing.id, briefing.cards, opening, closing, cardTransitions);
     text = renderBriefingPlainText(briefing.cards, opening, closing, cardTransitions);
   } else {
@@ -215,15 +222,43 @@ export async function sendBriefingEmail(
 }
 
 /**
- * Format briefing with enhanced narratives.
- * Used for preview command.
+ * Format briefing with enhanced narratives and action items.
+ * Used for preview command (plain text).
  */
 export function formatBriefingWithNarratives(
   briefing: Briefing,
   signals: ExtractedSignals
 ): string {
-  const { opening, cardTransitions, closing } = wrapWithNarratives(briefing.cards, signals);
+  const { opening, cardTransitions, closing } = wrapWithNarratives(
+    briefing.cards,
+    signals,
+    signals.actionItems,
+    signals.quickWins
+  );
   return renderBriefingPlainText(briefing.cards, opening, closing, cardTransitions);
+}
+
+/**
+ * Format briefing with ANSI colors for terminal preview.
+ */
+export function formatBriefingForTerminal(
+  briefing: Briefing,
+  signals: ExtractedSignals
+): string {
+  const { opening, cardTransitions, closing } = wrapWithNarratives(
+    briefing.cards,
+    signals,
+    signals.actionItems,
+    signals.quickWins
+  );
+  return renderBriefingTerminal(briefing.cards, opening, closing, cardTransitions);
+}
+
+/**
+ * Format simple briefing with ANSI colors for terminal preview.
+ */
+export function formatBriefingAsTerminal(briefing: Briefing): string {
+  return formatMarkdownForTerminal(formatBriefingAsMarkdown(briefing));
 }
 
 export { formatBriefingAsMarkdown, formatBriefingAsHtml };

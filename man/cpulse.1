@@ -1,5 +1,6 @@
 .\" Manpage for cpulse
 .\" Contact qfennessy@gmail.com for errors or typos.
+.\" Updated: 2026-01-13
 .TH CPULSE 1 "January 2026" "0.7.0" "Commit Pulse Manual"
 .SH NAME
 cpulse \- personal daily briefings from Claude Code sessions and GitHub activity
@@ -10,7 +11,7 @@ cpulse \- personal daily briefings from Claude Code sessions and GitHub activity
 .B cpulse
 (Commit Pulse) analyzes your development activity over the past week and generates concise, actionable briefings delivered to your email each morning.
 .PP
-It integrates with Claude Code session logs and GitHub to surface patterns, open questions, code review needs, and provides AI-powered advisory cards with architectural guidance.
+It integrates with Claude Code session logs and GitHub to surface patterns, open questions, code review needs, and actionable next steps.
 .SH COMMANDS
 .TP
 .B init
@@ -19,8 +20,8 @@ Create a default configuration file at ~/.cpulse/config.yaml
 .B generate \fR[\fIoptions\fR]
 Generate and optionally send a daily briefing. See GENERATE OPTIONS below.
 .TP
-.B preview
-Preview what signals would be collected without making API calls to Claude.
+.B preview \fR[\fIoptions\fR]
+Preview what signals would be collected without generating cards. Options: --hours.
 .TP
 .B history
 Show briefing history and statistics.
@@ -28,14 +29,11 @@ Show briefing history and statistics.
 .B config
 Display current configuration settings.
 .TP
-.B cards \fR[\fIaction\fR] [\fIcard-type\fR]
-List and configure briefing card types. Actions: list, enable, disable.
+.B patterns \fR[\fIoptions\fR]
+Show development patterns from recent Claude Code sessions. Options: --hours.
 .TP
-.B patterns
-Show development patterns from recent Claude Code sessions.
-.TP
-.B questions
-Show open questions extracted from recent sessions.
+.B questions \fR[\fIoptions\fR]
+Show open questions extracted from recent sessions. Options: --hours.
 .TP
 .B feedback \fIcard-index\fR \fIrating\fR
 Submit feedback for a card in the latest briefing. Rating: helpful, not_helpful, snoozed.
@@ -49,21 +47,18 @@ Set priority for a topic. Level: high, normal, low, ignored.
 .B priorities
 Show current topic priorities.
 .TP
-.B memory
-Show memory context status and loaded project memories.
+.B memory \fR[\fIoptions\fR]
+Show memory context status and loaded project memories. Options: --project <path>.
 .TP
 .B serve \fR[\fIoptions\fR]
 Start the web dashboard. Options: -p/--port, -H/--host.
-.TP
-.B install \fR[\fIoptions\fR]
-Install cpulse to ~/.cpulse/bin/ for global use. See INSTALL OPTIONS below.
 .SH GENERATE OPTIONS
 .TP
 .B \-\-hours \fIn\fR
 Hours of history to analyze. Default: 168 (7 days).
 .TP
 .B \-\-preview
-Print briefing to stdout instead of sending email.
+Print briefing to stdout with ANSI formatting instead of sending email.
 .TP
 .B \-\-all\-cards
 Generate all card types regardless of weekly rotation schedule.
@@ -76,15 +71,7 @@ Generate but do not send email.
 .TP
 .B \-\-no\-save
 Generate but do not save to briefing history.
-.SH INSTALL OPTIONS
-.TP
-.B \-\-force
-Overwrite existing installation.
-.TP
-.B \-\-link
-Create symlink in /usr/local/bin (requires sudo).
 .SH CARD TYPES
-.SS Daily Cards
 .TP
 .B project_continuity
 What you worked on, files modified, open todos, suggested next steps.
@@ -100,16 +87,6 @@ Development patterns and habits from your sessions.
 .TP
 .B post_merge_feedback
 Comments added to PRs after they were merged.
-.SS Weekly Advisory Cards
-.TP
-.B challenge_insights \fR(Mon/Tue)
-PR review patterns analysis with preventive guidance.
-.TP
-.B tech_advisory \fR(Wed/Thu)
-Stack-aware architectural advice with code examples.
-.TP
-.B cost_optimization \fR(Friday)
-GCP-focused cost saving recommendations.
 .SH CONFIGURATION
 Configuration is stored in ~/.cpulse/config.yaml. Key sections:
 .TP
@@ -123,7 +100,7 @@ Enable/disable Claude Code integration and set log path.
 Enable/disable GitHub integration, specify repos, include private repos.
 .TP
 .B preferences
-Article style, max cards, enabled_cards map for toggling card types.
+Article style, max cards per briefing.
 .SH ENVIRONMENT
 .TP
 .B ANTHROPIC_API_KEY
@@ -139,38 +116,63 @@ Main configuration file.
 .I ~/.cpulse/data/
 Briefing history, feedback, and cached data.
 .TP
-.I ~/.cpulse/bin/
-Installation directory when using 'cpulse install'.
-.TP
 .I ~/.cpulse/memory.md
 Global memory context for briefing generation.
 .TP
 .I <project>/docs/memory.md
-Project-specific memory context.
+Project-specific memory context (preferred location).
+.TP
+.I <project>/memory.md
+Project-specific memory context (fallback location).
+.SH INSTALLATION
+From the cpulse source directory:
+.PP
+.RS
+.B npm run link
+.RE
+.PP
+This builds the project, creates a global symlink via npm link, and installs this man page to /usr/local/share/man/man1/.
+.PP
+To uninstall:
+.PP
+.RS
+.B npm run unlink
+.RE
 .SH EXAMPLES
-.TP
 Initialize configuration:
+.RS
 .B cpulse init
-.TP
-Generate and preview a briefing:
+.RE
+.PP
+Generate and preview a briefing in terminal:
+.RS
 .B cpulse generate --preview
-.TP
+.RE
+.PP
 Generate all cards for testing:
+.RS
 .B cpulse generate --all-cards --preview
-.TP
+.RE
+.PP
 Send briefing via email:
+.RS
 .B cpulse generate
-.TP
-List card types and schedules:
-.B cpulse cards
-.TP
-Install globally:
-.B cpulse install --force
+.RE
+.PP
+Show development patterns:
+.RS
+.B cpulse patterns
+.RE
+.PP
+Start web dashboard on port 8080:
+.RS
+.B cpulse serve -p 8080
+.RE
 .SH CRON
 To receive daily briefings at 6 AM:
 .PP
 .RS
-0 6 * * * node ~/.cpulse/bin/cli.js generate >> ~/.cpulse/cron.log 2>&1
+0 6 * * * cpulse generate >> ~/.cpulse/cron.log 2>&1
 .RE
 .SH AUTHOR
 Written by Quentin Fennessy with Claude Code.

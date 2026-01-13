@@ -9,6 +9,8 @@ import {
   generateAndSendBriefing,
   formatBriefingAsMarkdown,
   formatBriefingWithNarratives,
+  formatBriefingForTerminal,
+  formatBriefingAsTerminal,
   getLatestBriefing,
   getBriefingStats,
   collectSignals,
@@ -69,6 +71,7 @@ program
   .option('--hours <hours>', 'Hours of history to analyze', '168')
   .option('--preview', 'Print briefing to stdout instead of sending')
   .option('--simple', 'Use simple formatting without narratives')
+  .option('--all-cards', 'Generate all card types, bypassing weekly rotation')
   .action(async (options) => {
     try {
       // Validate hours before loading config to fail fast
@@ -83,13 +86,14 @@ program
         send: options.send,
         save: options.save,
         hoursBack,
+        allCards: options.allCards,
       });
 
       if (options.preview || !options.send) {
         if (options.simple) {
-          console.log(formatBriefingAsMarkdown(briefing));
+          console.log(formatBriefingAsTerminal(briefing));
         } else {
-          console.log(formatBriefingWithNarratives(briefing, signals));
+          console.log(formatBriefingForTerminal(briefing, signals));
         }
       } else {
         console.log(`Briefing sent to ${config.email.to}`);

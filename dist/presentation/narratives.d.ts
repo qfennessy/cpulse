@@ -2,7 +2,7 @@
  * Narrative transitions for briefings.
  * Generates contextual intro text and transitions between cards.
  */
-import type { ArticleCard, ExtractedSignals } from '../types/index.js';
+import type { ArticleCard, ExtractedSignals, ActionItem } from '../types/index.js';
 export interface NarrativeContext {
     timeOfDay: 'morning' | 'afternoon' | 'evening';
     dayOfWeek: string;
@@ -26,12 +26,14 @@ export declare function generateOpeningNarrative(context: NarrativeContext): str
 export declare function generateTransition(previousCard: ArticleCard | null, nextCard: ArticleCard, context: NarrativeContext): string | null;
 /**
  * Generate closing narrative for the briefing.
+ * When action items are provided, generates specific, actionable closing.
+ * Falls back to generic closing when no action items available.
  */
-export declare function generateClosingNarrative(cards: ArticleCard[], context: NarrativeContext): string;
+export declare function generateClosingNarrative(cards: ArticleCard[], context: NarrativeContext, actionItems?: ActionItem[], quickWins?: ActionItem[]): string;
 /**
  * Wrap a briefing with narrative elements.
  */
-export declare function wrapWithNarratives(cards: ArticleCard[], signals: ExtractedSignals): {
+export declare function wrapWithNarratives(cards: ArticleCard[], signals: ExtractedSignals, actionItems?: ActionItem[], quickWins?: ActionItem[]): {
     opening: string;
     cardTransitions: Map<number, string>;
     closing: string;
@@ -39,5 +41,5 @@ export declare function wrapWithNarratives(cards: ArticleCard[], signals: Extrac
 /**
  * Format a complete briefing with narratives as markdown.
  */
-export declare function formatBriefingWithNarratives(cards: ArticleCard[], signals: ExtractedSignals): string;
+export declare function formatBriefingWithNarratives(cards: ArticleCard[], signals: ExtractedSignals, actionItems?: ActionItem[], quickWins?: ActionItem[]): string;
 //# sourceMappingURL=narratives.d.ts.map

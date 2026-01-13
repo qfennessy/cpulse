@@ -511,13 +511,21 @@ Peak working hours: ${peakHours.join(', ')}
 
 Top tools used: ${patterns.toolUsage.slice(0, 5).map((t) => t.tool).join(', ')}
 
-Generate a briefing that:
-1. Highlights interesting patterns in work habits
-2. Notes which projects/files are getting the most attention
-3. Identifies any concerning patterns (e.g., lots of debugging, same files edited repeatedly)
-4. Provides one actionable insight based on the patterns
+Generate a PRESCRIPTIVE briefing that provides SPECIFIC, ACTIONABLE recommendations:
 
-Keep it brief and insightful. Focus on patterns that help the developer understand their work habits.
+1. Identify ONE specific actionable recommendation based on the patterns observed
+2. If same files are edited repeatedly (high churn), suggest: "Consider refactoring [filename] to reduce edit frequency"
+3. If debugging patterns are frequent, suggest: "Add tests for [area] to catch issues earlier"
+4. If work is scattered across many projects, suggest: "Focus today on completing work in [most active project]"
+5. Based on peak hours, suggest optimal time blocks: "Schedule deep work between [peak hours]"
+
+IMPORTANT:
+- Be prescriptive, not just observational
+- Every insight MUST lead to a specific "try this today" action
+- End with a concrete, single-sentence recommendation the developer can act on immediately
+- Do NOT just describe what happened - tell them what to DO about it
+
+Keep it brief (2-3 short paragraphs). Focus on one or two key insights with clear actions.
 Output only the briefing content in markdown format, no preamble.`;
 
   const response = await client.messages.create({
@@ -613,8 +621,10 @@ Output only the briefing content in markdown format, no preamble.`;
 
 export async function generateBriefing(
   config: Config,
-  signals: ExtractedSignals
+  signals: ExtractedSignals,
+  options: { allCards?: boolean } = {}
 ): Promise<Briefing> {
+  const { allCards = false } = options;
   const apiKey = config.anthropic_api_key || process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {
     throw new Error(
@@ -643,27 +653,27 @@ export async function generateBriefing(
   const cardPromises: Promise<ArticleCard | null>[] = [];
 
   // Project Continuity card (from Claude Code sessions)
-  if (config.sources.claude_code.enabled && shouldIncludeCardType(dataDir, 'project_continuity')) {
+  if (config.sources.claude_code.enabled && (allCards || shouldIncludeCardType(dataDir, 'project_continuity'))) {
     cardPromises.push(generateProjectContinuityCard(client, signals, config, systemPrompt));
   }
 
   // Code Review card (from GitHub activity)
-  if (config.sources.github.enabled && shouldIncludeCardType(dataDir, 'code_review')) {
+  if (config.sources.github.enabled && (allCards || shouldIncludeCardType(dataDir, 'code_review'))) {
     cardPromises.push(generateCodeReviewCard(client, signals, config, systemPrompt));
   }
 
   // Open Questions card (from session analysis)
-  if (config.sources.claude_code.enabled && shouldIncludeCardType(dataDir, 'open_questions')) {
+  if (config.sources.claude_code.enabled && (allCards || shouldIncludeCardType(dataDir, 'open_questions'))) {
     cardPromises.push(generateOpenQuestionsCard(client, questions, config, systemPrompt));
   }
 
   // Patterns card (from session analysis)
-  if (config.sources.claude_code.enabled && shouldIncludeCardType(dataDir, 'patterns')) {
+  if (config.sources.claude_code.enabled && (allCards || shouldIncludeCardType(dataDir, 'patterns'))) {
     cardPromises.push(generatePatternsCard(client, patterns, config, systemPrompt));
   }
 
   // Post-Merge Feedback card (from GitHub post-merge comments)
-  if (config.sources.github.enabled && shouldIncludeCardType(dataDir, 'post_merge_feedback')) {
+  if (config.sources.github.enabled && (allCards || shouldIncludeCardType(dataDir, 'post_merge_feedback'))) {
     cardPromises.push(generatePostMergeFeedbackCard(client, signals.github.postMergeComments, config, systemPrompt));
   }
 

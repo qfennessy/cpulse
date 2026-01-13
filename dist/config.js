@@ -37,16 +37,6 @@ const DEFAULT_CONFIG = {
         max_cards: 5,
         focus_topics: [],
         ignored_topics: [],
-        enabled_cards: {
-            project_continuity: true,
-            code_review: true,
-            open_questions: true,
-            patterns: true,
-            post_merge_feedback: true,
-            tech_advisory: true,
-            challenge_insights: true,
-            cost_optimization: true,
-        },
     },
 };
 export function ensureConfigDir() {
@@ -99,10 +89,6 @@ export function loadConfig() {
         preferences: {
             ...DEFAULT_CONFIG.preferences,
             ...userConfig?.preferences,
-            enabled_cards: {
-                ...DEFAULT_CONFIG.preferences.enabled_cards,
-                ...userConfig?.preferences?.enabled_cards,
-            },
         },
     };
     // Override with environment variables if set
@@ -150,15 +136,6 @@ preferences:
   max_cards: 5
   focus_topics: []
   ignored_topics: []
-  enabled_cards:
-    project_continuity: true
-    code_review: true
-    open_questions: true
-    patterns: true
-    post_merge_feedback: true
-    tech_advisory: true       # Wed/Thu - architectural advice
-    challenge_insights: true  # Mon/Tue - PR pattern analysis
-    cost_optimization: true   # Fri - GCP cost tips
 
 # anthropic_api_key: sk-xxx  # Or set ANTHROPIC_API_KEY env var
 `;

@@ -79,6 +79,16 @@ export interface ToolCall {
 export interface TodoItem {
   content: string;
   status: 'pending' | 'in_progress' | 'completed';
+  // Session context (populated during extraction)
+  sessionId?: string;
+  project?: string;
+  projectPath?: string;
+  // Files modified when this todo was created/updated
+  relatedFiles?: string[];
+  // Recurrence tracking across sessions
+  firstSeen?: Date;
+  lastSeen?: Date;
+  occurrenceCount?: number;
 }
 
 export interface GitHubCommit {
@@ -102,6 +112,12 @@ export interface GitHubPR {
   mergedAt?: Date;
   reviewComments: number;
   isDraft: boolean;
+  // Urgency metrics (computed during fetch)
+  ageInDays?: number;
+  urgency?: 'low' | 'medium' | 'high' | 'critical';
+  // Review context
+  isReviewRequested?: boolean;
+  reviewAgeInDays?: number;
 }
 
 export interface PostMergeComment {
@@ -117,6 +133,11 @@ export interface PostMergeComment {
   isReviewComment: boolean;
   path?: string;
   line?: number;
+  // Severity classification (computed during fetch)
+  severity?: 'critical' | 'suggestion' | 'question' | 'info';
+  severityReason?: string;
+  requiresFollowUp?: boolean;
+  suggestedAction?: string;
 }
 
 export interface GitHubActivity {
@@ -124,6 +145,32 @@ export interface GitHubActivity {
   pullRequests: GitHubPR[];
   staleBranches: string[];
   postMergeComments: PostMergeComment[];
+}
+
+// Action tracking types
+export interface ActionItem {
+  id: string;
+  content: string;
+  category: 'pr_review' | 'todo' | 'post_merge' | 'question' | 'quick_win' | 'blocker';
+  priority: number;
+  source: {
+    type: 'pr' | 'session' | 'comment';
+    ref: string;
+    project?: string;
+  };
+  isStartHere?: boolean;
+  estimatedEffort?: 'trivial' | 'small' | 'medium' | 'large';
+  deepLink?: string;
+  context?: string;
+}
+
+export interface BlockerInfo {
+  description: string;
+  project: string;
+  sessionId: string;
+  blockedBy?: string;
+  waitingOn?: string;
+  detectedAt: Date;
 }
 
 // Article types
@@ -155,6 +202,10 @@ export interface ExtractedSignals {
     openTodos: TodoItem[];
     unresolvedErrors: string[];
     activeProjects: string[];
+    blockers?: BlockerInfo[];
   };
   github: GitHubActivity;
+  // Computed action items from all sources
+  actionItems?: ActionItem[];
+  quickWins?: ActionItem[];
 }

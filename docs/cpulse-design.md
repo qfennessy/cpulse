@@ -1,7 +1,7 @@
 # cpulse Design Document
 
 **Created:** 2026-01-12
-**Last Updated:** 2026-01-12
+**Last Updated:** 2026-01-13
 
 **Status:** Design approved
 
@@ -401,6 +401,61 @@ Next steps:
 - Topic trend analysis over time
 - Feedback pattern visualization
 
+### Phase 5: Project Memory & Context-Aware Briefings
+
+**Inspired by ChatGPT Pulse's memory system**, this phase adds persistent project knowledge that makes briefings more relevant and actionable.
+
+**Memory Files:**
+- Support `~/.cpulse/memory.md` for global context
+- Support per-project `docs/memory.md` files (auto-discovered from git repos)
+- Memory files contain structured project knowledge:
+  - Tech stack and architecture decisions
+  - Team workflows and conventions
+  - Domain-specific terminology
+  - Known pain points and priorities
+  - Related projects and dependencies
+
+**Context-Aware Generation:**
+- Include relevant memory context in LLM prompts
+- Generate domain-aware suggestions (e.g., "The Firestore index may need updating for this new query")
+- Understand project relationships (e.g., cpulse briefing knows about cocos-story context)
+- Reference architectural decisions when suggesting improvements
+- Use tech stack knowledge for more specific recommendations
+
+**Smart Summarization:**
+- Understand monorepo structure (apps/web, apps/interviewer, services/functions)
+- Know which files are high-impact (e.g., @repo/types changes affect everything)
+- Recognize workflow patterns (PRs to develop, AI code review requirement)
+- Highlight changes that conflict with documented conventions
+
+**Memory Management:**
+- CLI command to view/edit memory: `cpulse memory`
+- Web interface for memory editing with preview
+- Auto-suggest memory additions from repeated session patterns
+- Memory versioning (track when context was added/updated)
+
+**Card Enhancements:**
+- New card type: "Architecture Reminder" - surface relevant decisions when patterns suggest drift
+- New card type: "Convention Check" - highlight when recent work may violate documented practices
+- Enhanced suggestions using domain knowledge
+- Cross-project insights (e.g., "Changes to @repo/types may require Python model updates")
+
+**Example Memory-Enhanced Briefing:**
+
+```
+## Project Continuity: cocos-story
+
+You've been working on the interviewer service's entity extraction pipeline.
+
+**Context reminder:** Per your architecture docs, all date fields must use
+the DateInfo format, not strings. I noticed 3 new date fields added yesterday
+in the fact extraction logic - verify they follow this pattern.
+
+**Related:** The @repo/types package was updated last week. Since the Python
+service has contract tests against these types, you may want to run
+`pytest apps/interviewer -k contract` to verify sync.
+```
+
 ---
 
 ## Future Considerations
@@ -410,6 +465,7 @@ Items explicitly deferred for potential future implementation:
 - **Claude.ai conversation integration** - Add as data source when official API becomes available
 - **Multi-machine sync** - Aggregate Claude Code logs across machines if workflow requires it
 - **On-demand briefings** - Trigger briefings outside the daily schedule
+- **Memory learning** - Auto-extract and suggest memory entries from session patterns
 
 ---
 

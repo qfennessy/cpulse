@@ -3,15 +3,22 @@
   "version": "0.6.0",
   "description": "Commit Pulse - Personal daily briefings from Claude Code sessions and GitHub activity",
   "type": "module",
+  "engines": {
+    "node": ">=18.0.0"
+  },
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "bin": {
     "cpulse": "dist/cli.js"
   },
   "scripts": {
+    "build": "tsc",
     "cpulse": "node dist/cli.js",
     "start": "node dist/cli.js serve",
-    "generate": "node dist/cli.js generate"
+    "generate": "node dist/cli.js generate",
+    "dev": "tsx src/cli.ts",
+    "preview": "tsx src/cli.ts preview",
+    "test": "vitest"
   },
   "keywords": [
     "briefings",
@@ -31,7 +38,13 @@
     "nodemailer": "^6.10.0",
     "octokit": "^4.1.0"
   },
-  "engines": {
-    "node": ">=18.0.0"
+  "devDependencies": {
+    "@types/express": "^5.0.6",
+    "@types/js-yaml": "^4.0.9",
+    "@types/node": "^20.0.0",
+    "@types/nodemailer": "^6.4.17",
+    "tsx": "^4.19.0",
+    "typescript": "^5.7.0",
+    "vitest": "^2.1.0"
   }
 }

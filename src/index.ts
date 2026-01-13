@@ -1,0 +1,158 @@
+import type { Config, ExtractedSignals, Briefing } from './types/index.js';
+import {
+  getRecentSessions,
+  extractOpenTodos,
+  extractActiveProjects,
+  extractUnresolvedErrors,
+} from './sources/claude-code.js';
+import { getGitHubActivity } from './sources/github.js';
+import { generateBriefing } from './generation/articles.js';
+import {
+  sendBriefingEmail,
+  formatBriefingAsMarkdown,
+  formatBriefingWithNarratives,
+} from './delivery/email.js';
+import { saveBriefing, getLatestBriefing } from './storage/briefings.js';
+
+export async function collectSignals(
+  config: Config,
+  hoursBack: number = 168
+): Promise<ExtractedSignals> {
+  const signals: ExtractedSignals = {
+    claudeCode: {
+      recentSessions: [],
+      openTodos: [],
+      unresolvedErrors: [],
+      activeProjects: [],
+    },
+    github: {
+      commits: [],
+      pullRequests: [],
+      staleBranches: [],
+      postMergeComments: [],
+    },
+  };
+
+  // Collect Claude Code signals
+  if (config.sources.claude_code.enabled) {
+    const sessions = getRecentSessions(config.sources.claude_code, hoursBack);
+    signals.claudeCode.recentSessions = sessions;
+    signals.claudeCode.openTodos = extractOpenTodos(sessions);
+    signals.claudeCode.activeProjects = extractActiveProjects(sessions);
+    signals.claudeCode.unresolvedErrors = extractUnresolvedErrors(sessions);
+  }
+
+  // Collect GitHub signals
+  if (config.sources.github.enabled) {
+    signals.github = await getGitHubActivity(config.sources.github, hoursBack);
+  }
+
+  return signals;
+}
+
+export interface GenerateBriefingResult {
+  briefing: Briefing;
+  signals: ExtractedSignals;
+}
+
+export async function generateAndSendBriefing(
+  config: Config,
+  options: { send?: boolean; save?: boolean; hoursBack?: number } = {}
+): Promise<GenerateBriefingResult> {
+  const { send = true, save = true, hoursBack = 168 } = options;
+
+  // Collect signals
+  const signals = await collectSignals(config, hoursBack);
+
+  // Generate briefing
+  const briefing = await generateBriefing(config, signals);
+
+  // Save briefing
+  if (save && config.data_dir) {
+    saveBriefing(config.data_dir, briefing);
+  }
+
+  // Send email with enhanced presentation (includes narratives)
+  if (send) {
+    await sendBriefingEmail(config.email, briefing, signals);
+  }
+
+  return { briefing, signals };
+}
+
+export {
+  loadConfig,
+  createDefaultConfig,
+  configExists,
+  getConfigPath,
+} from './config.js';
+
+export { formatBriefingAsMarkdown, formatBriefingWithNarratives } from './delivery/email.js';
+export { getLatestBriefing, loadBriefings, getBriefingStats } from './storage/briefings.js';
+
+// Presentation module exports
+export {
+  prLink,
+  commitLink,
+  fileLink,
+  fileLinkWithLine,
+  branchCompareLink,
+  formatPRList,
+  formatCommitList,
+  wrapWithNarratives,
+  formatBriefingWithNarratives as formatWithNarratives,
+  renderBriefingHtml,
+} from './presentation/index.js';
+
+// Worktree detection exports
+export {
+  isWorktree,
+  getMainRepoPath,
+  getParentProject,
+  groupByParentProject,
+  formatProjectWithWorktrees,
+} from './sources/worktree.js';
+
+// Intelligence module exports
+export {
+  analyzePatterns,
+  formatPatternSummary,
+  extractAllQuestions,
+  formatQuestionsForBriefing,
+  saveFeedback,
+  loadFeedback,
+  computeFeedbackStats,
+  recordBriefingFeedback,
+  loadTopicPriorities,
+  updateTopicPriority,
+  type PatternAnalysis,
+  type OpenQuestion,
+  type FeedbackEntry,
+  type FeedbackStats,
+  type TopicPriority,
+} from './intelligence/index.js';
+
+// Web module exports
+export {
+  createWebServer,
+  getAnalytics,
+  type WebServerOptions,
+  type Analytics,
+} from './web/index.js';
+
+// Memory module exports
+export {
+  loadGlobalMemory,
+  loadProjectMemory,
+  loadMemoryContext,
+  loadMemoryFile,
+  findProjectMemory,
+  formatMemoryForPrompt,
+  extractRelevantSections,
+  getMemorySummary,
+  getGitRoot,
+  extractProjectName,
+  type ProjectMemory,
+  type MemorySection,
+  type MemoryContext,
+} from './memory/index.js';

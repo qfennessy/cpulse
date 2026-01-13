@@ -566,10 +566,14 @@ The CLAUDE.md section MUST be formatted exactly like this for easy copy-paste:
 
 **Add to CLAUDE.md:**
 \`\`\`
-- When working with Firestore queries, always use batch reads (getAll) instead of individual reads in loops
+- when working with Firestore queries, use batch reads (getAll) instead of individual reads in loops
 \`\`\`
 
-The text inside the code block should be a single bullet point rule that can be directly pasted into a CLAUDE.md file.
+Rules should match existing CLAUDE.md style:
+- Start with lowercase (unless proper noun)
+- Imperative form ("use X" not "you should use X")
+- Concise, single-line rules
+- No periods at end
 
 Style: Concise, direct, technically accurate. Include working code.
 Do NOT be generic - make it specific to their exact stack.
@@ -636,11 +640,15 @@ The CLAUDE.md section MUST be formatted exactly like this for easy copy-paste:
 
 **Add to CLAUDE.md:**
 \`\`\`
-- Always add null checks when accessing nested object properties from external data sources
-- When writing async code, ensure all promises have proper error handling with try/catch
+- always add null checks when accessing nested object properties from external data sources
+- when writing async code, ensure all promises have proper error handling with try/catch
 \`\`\`
 
-The text inside the code block should be bullet point rules that can be directly pasted into a CLAUDE.md file.
+Rules should match existing CLAUDE.md style:
+- Start with lowercase (unless proper noun)
+- Imperative form ("add X" not "you should add X")
+- Concise, single-line rules
+- No periods at end
 
 Style: Direct and specific. This is about giving Claude Code better instructions.
 Focus on rules that will prevent these patterns in future sessions.
@@ -708,11 +716,15 @@ The CLAUDE.md section MUST be formatted exactly like this for easy copy-paste:
 
 **Add to CLAUDE.md:**
 \`\`\`
-- When reading multiple Firestore documents, use batch reads (getAll) instead of individual reads
-- Prefer Cloud Run scale-to-zero configurations over always-on instances for non-latency-critical services
+- when reading multiple Firestore documents, use batch reads (getAll) instead of individual reads
+- prefer Cloud Run scale-to-zero configurations over always-on instances for non-latency-critical services
 \`\`\`
 
-The text inside the code block should be bullet point rules that can be directly pasted into a CLAUDE.md file.
+Rules should match existing CLAUDE.md style:
+- Start with lowercase (unless proper noun)
+- Imperative form ("use X" not "you should use X")
+- Concise, single-line rules
+- No periods at end
 
 Focus on quick wins that Claude Code can implement.
 Be specific to their stack (GCP, Firestore, Cloud Run).

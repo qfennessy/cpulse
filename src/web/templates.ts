@@ -251,7 +251,7 @@ function baseTemplate(title: string, content: string, activeNav: string = ''): s
 <body>
   <header>
     <div class="container">
-      <a href="/" class="logo">cpulse</a>
+      <a href="/" class="logo">Commit Pulse</a>
       <nav>
         <a href="/"${activeNav === 'briefings' ? ' class="active"' : ''}>Briefings</a>
         <a href="/analytics"${activeNav === 'analytics' ? ' class="active"' : ''}>Analytics</a>
@@ -324,7 +324,7 @@ export function renderDashboardPage(
   const content = `
     <h1>Briefing History</h1>
     <input type="search" class="search-box" placeholder="Search briefings..."
-           onkeyup="if(event.key==='Enter')location.href='/api/search?q='+encodeURIComponent(this.value)">
+           onkeyup="if(event.key==='Enter')location.href='/search?q='+encodeURIComponent(this.value)">
     ${briefings.length === 0 ? '<p class="muted">No briefings yet. Run <code>cpulse generate</code> to create your first briefing.</p>' : briefingItems}
     ${pagination}
   `;
@@ -467,6 +467,54 @@ export function renderAnalyticsPage(analytics: Analytics): string {
   `;
 
   return baseTemplate('Analytics', content, 'analytics');
+}
+
+export function renderSearchResultsPage(
+  query: string,
+  results: StoredBriefing[]
+): string {
+  const briefingItems = results
+    .map((b) => {
+      const date = new Date(b.date).toLocaleDateString('en-US', {
+        weekday: 'short',
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+      });
+
+      const matchingCards = b.cards.filter(
+        (card) =>
+          card.title.toLowerCase().includes(query.toLowerCase()) ||
+          card.content.toLowerCase().includes(query.toLowerCase())
+      );
+
+      const cardBadges = matchingCards
+        .slice(0, 4)
+        .map((card) => {
+          const style = CARD_TYPE_LABELS[card.type] || CARD_TYPE_LABELS.project_continuity;
+          return `<span class="badge" style="background:${style.color}22;color:${style.color}">${style.label}</span>`;
+        })
+        .join('');
+
+      return `
+        <a href="/briefing/${b.id}" class="briefing-item">
+          <span class="briefing-date">${date}</span>
+          <div class="briefing-cards">${cardBadges}</div>
+        </a>
+      `;
+    })
+    .join('');
+
+  const content = `
+    <p class="muted"><a href="/">&larr; Back to briefings</a></p>
+    <h1>Search Results</h1>
+    <input type="search" class="search-box" placeholder="Search briefings..."
+           value="${escapeHtml(query)}"
+           onkeyup="if(event.key==='Enter')location.href='/search?q='+encodeURIComponent(this.value)">
+    ${results.length === 0 ? `<p class="muted">No briefings found matching "${escapeHtml(query)}"</p>` : `<p class="muted">${results.length} result${results.length === 1 ? '' : 's'} found</p>${briefingItems}`}
+  `;
+
+  return baseTemplate(`Search: ${query}`, content, 'briefings');
 }
 
 export function renderConfigPage(config: Config): string {

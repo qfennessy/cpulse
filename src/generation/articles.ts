@@ -28,11 +28,16 @@ import {
   formatProjectWithWorktrees,
   groupByParentProject,
 } from '../sources/worktree.js';
+import {
+  loadMemoryContext,
+  formatMemoryForPrompt,
+  type MemoryContext,
+} from '../memory/index.js';
 
 // Re-export intelligence types for external use
 export type { PatternAnalysis, OpenQuestion };
 
-const SYSTEM_PROMPT = `You are cpulse, a personal briefing assistant that generates concise, actionable insights from development activity.
+const BASE_SYSTEM_PROMPT = `You are cpulse, a personal briefing assistant that generates concise, actionable insights from development activity.
 
 Your communication style:
 - Direct and technically accurate
@@ -46,6 +51,32 @@ Your communication style:
 IMPORTANT: When the input contains markdown links like [text](url), you MUST preserve them exactly in your output. These links make the briefing actionable by letting the user click directly to PRs, commits, and files.
 
 Your goal is to help the developer pick up where they left off and stay oriented on their projects.`;
+
+/**
+ * Build system prompt with optional memory context.
+ * Memory provides project-specific knowledge for more relevant briefings.
+ */
+function buildSystemPrompt(memoryContext?: MemoryContext, primaryProject?: string): string {
+  const memoryText = memoryContext ? formatMemoryForPrompt(memoryContext, primaryProject) : '';
+
+  if (!memoryText) {
+    return BASE_SYSTEM_PROMPT;
+  }
+
+  return `${BASE_SYSTEM_PROMPT}
+
+## Project Memory
+
+You have access to persistent project knowledge. Use this context to provide more relevant, project-aware insights:
+
+${memoryText}
+
+When generating briefings, consider:
+- Project-specific conventions and patterns mentioned in memory
+- Known architectural decisions and their rationale
+- Team preferences and established workflows
+- Previous context that might inform current work`;
+}
 
 function formatSessionSummary(session: ClaudeCodeSession): string {
   // Check if this session is part of a worktree
@@ -255,7 +286,8 @@ function formatPostMergeCommentsSummary(comments: PostMergeComment[]): string {
 export async function generateProjectContinuityCard(
   client: Anthropic,
   signals: ExtractedSignals,
-  config: Config
+  config: Config,
+  systemPrompt: string = BASE_SYSTEM_PROMPT
 ): Promise<ArticleCard | null> {
   const sessions = signals.claudeCode.recentSessions;
   if (sessions.length === 0) return null;
@@ -294,7 +326,7 @@ Output only the briefing content in markdown format, no preamble.`;
   const response = await client.messages.create({
     model: 'claude-sonnet-4-20250514',
     max_tokens: 1024,
-    system: SYSTEM_PROMPT,
+    system: systemPrompt,
     messages: [{ role: 'user', content: prompt }],
   });
 
@@ -326,7 +358,8 @@ Output only the briefing content in markdown format, no preamble.`;
 export async function generateCodeReviewCard(
   client: Anthropic,
   signals: ExtractedSignals,
-  config: Config
+  config: Config,
+  systemPrompt: string = BASE_SYSTEM_PROMPT
 ): Promise<ArticleCard | null> {
   const { commits, pullRequests, staleBranches } = signals.github;
 
@@ -362,7 +395,7 @@ Output only the briefing content in markdown format, no preamble.`;
   const response = await client.messages.create({
     model: 'claude-sonnet-4-20250514',
     max_tokens: 1024,
-    system: SYSTEM_PROMPT,
+    system: systemPrompt,
     messages: [{ role: 'user', content: prompt }],
   });
 
@@ -394,7 +427,8 @@ Output only the briefing content in markdown format, no preamble.`;
 export async function generateOpenQuestionsCard(
   client: Anthropic,
   questions: OpenQuestion[],
-  config: Config
+  config: Config,
+  systemPrompt: string = BASE_SYSTEM_PROMPT
 ): Promise<ArticleCard | null> {
   if (questions.length === 0) return null;
 
@@ -417,7 +451,7 @@ Output only the briefing content in markdown format, no preamble.`;
   const response = await client.messages.create({
     model: 'claude-sonnet-4-20250514',
     max_tokens: 1024,
-    system: SYSTEM_PROMPT,
+    system: systemPrompt,
     messages: [{ role: 'user', content: prompt }],
   });
 
@@ -447,7 +481,8 @@ Output only the briefing content in markdown format, no preamble.`;
 export async function generatePatternsCard(
   client: Anthropic,
   patterns: PatternAnalysis,
-  config: Config
+  config: Config,
+  systemPrompt: string = BASE_SYSTEM_PROMPT
 ): Promise<ArticleCard | null> {
   // Only generate if we have meaningful patterns
   if (
@@ -488,7 +523,7 @@ Output only the briefing content in markdown format, no preamble.`;
   const response = await client.messages.create({
     model: 'claude-sonnet-4-20250514',
     max_tokens: 1024,
-    system: SYSTEM_PROMPT,
+    system: systemPrompt,
     messages: [{ role: 'user', content: prompt }],
   });
 
@@ -519,7 +554,8 @@ Output only the briefing content in markdown format, no preamble.`;
 export async function generatePostMergeFeedbackCard(
   client: Anthropic,
   comments: PostMergeComment[],
-  config: Config
+  config: Config,
+  systemPrompt: string = BASE_SYSTEM_PROMPT
 ): Promise<ArticleCard | null> {
   if (comments.length === 0) return null;
 
@@ -547,7 +583,7 @@ Output only the briefing content in markdown format, no preamble.`;
   const response = await client.messages.create({
     model: 'claude-sonnet-4-20250514',
     max_tokens: 1024,
-    system: SYSTEM_PROMPT,
+    system: systemPrompt,
     messages: [{ role: 'user', content: prompt }],
   });
 
@@ -589,6 +625,16 @@ export async function generateBriefing(
   const client = new Anthropic({ apiKey });
   const dataDir = config.data_dir || `${process.env.HOME}/.cpulse`;
 
+  // Load memory context from active project paths
+  const projectPaths = signals.claudeCode.recentSessions.map((s) => s.projectPath);
+  const memoryContext = loadMemoryContext(projectPaths);
+
+  // Determine primary project for memory lookup
+  const primaryProject = signals.claudeCode.activeProjects[0] || undefined;
+
+  // Build system prompt with memory context
+  const systemPrompt = buildSystemPrompt(memoryContext, primaryProject);
+
   // Analyze patterns and extract questions from sessions
   const patterns = analyzePatterns(signals.claudeCode.recentSessions);
   const questions = extractAllQuestions(signals.claudeCode.recentSessions);
@@ -598,27 +644,27 @@ export async function generateBriefing(
 
   // Project Continuity card (from Claude Code sessions)
   if (config.sources.claude_code.enabled && shouldIncludeCardType(dataDir, 'project_continuity')) {
-    cardPromises.push(generateProjectContinuityCard(client, signals, config));
+    cardPromises.push(generateProjectContinuityCard(client, signals, config, systemPrompt));
   }
 
   // Code Review card (from GitHub activity)
   if (config.sources.github.enabled && shouldIncludeCardType(dataDir, 'code_review')) {
-    cardPromises.push(generateCodeReviewCard(client, signals, config));
+    cardPromises.push(generateCodeReviewCard(client, signals, config, systemPrompt));
   }
 
   // Open Questions card (from session analysis)
   if (config.sources.claude_code.enabled && shouldIncludeCardType(dataDir, 'open_questions')) {
-    cardPromises.push(generateOpenQuestionsCard(client, questions, config));
+    cardPromises.push(generateOpenQuestionsCard(client, questions, config, systemPrompt));
   }
 
   // Patterns card (from session analysis)
   if (config.sources.claude_code.enabled && shouldIncludeCardType(dataDir, 'patterns')) {
-    cardPromises.push(generatePatternsCard(client, patterns, config));
+    cardPromises.push(generatePatternsCard(client, patterns, config, systemPrompt));
   }
 
   // Post-Merge Feedback card (from GitHub post-merge comments)
   if (config.sources.github.enabled && shouldIncludeCardType(dataDir, 'post_merge_feedback')) {
-    cardPromises.push(generatePostMergeFeedbackCard(client, signals.github.postMergeComments, config));
+    cardPromises.push(generatePostMergeFeedbackCard(client, signals.github.postMergeComments, config, systemPrompt));
   }
 
   const cardResults = await Promise.all(cardPromises);

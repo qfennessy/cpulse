@@ -139,3 +139,20 @@ export {
   type WebServerOptions,
   type Analytics,
 } from './web/index.js';
+
+// Memory module exports
+export {
+  loadGlobalMemory,
+  loadProjectMemory,
+  loadMemoryContext,
+  loadMemoryFile,
+  findProjectMemory,
+  formatMemoryForPrompt,
+  extractRelevantSections,
+  getMemorySummary,
+  getGitRoot,
+  extractProjectName,
+  type ProjectMemory,
+  type MemorySection,
+  type MemoryContext,
+} from './memory/index.js';

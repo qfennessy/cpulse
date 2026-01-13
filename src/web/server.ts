@@ -21,6 +21,7 @@ import {
   renderBriefingPage,
   renderAnalyticsPage,
   renderConfigPage,
+  renderSearchResultsPage,
 } from './templates.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -90,6 +91,27 @@ export function createWebServer(options: WebServerOptions = {}) {
     res.send(html);
   });
 
+  // Search results page (HTML)
+  app.get('/search', (req: Request, res: Response) => {
+    const query = (req.query.q as string || '').trim();
+    if (!query) {
+      res.redirect('/');
+      return;
+    }
+
+    const briefings = getAllBriefings(dataDir);
+    const results = briefings.filter((b) => {
+      return b.cards.some(
+        (card) =>
+          card.title.toLowerCase().includes(query.toLowerCase()) ||
+          card.content.toLowerCase().includes(query.toLowerCase())
+      );
+    });
+
+    const html = renderSearchResultsPage(query, results.slice(0, 50));
+    res.send(html);
+  });
+
   // API endpoints
   app.get('/api/briefings', (req: Request, res: Response) => {
     const briefings = getAllBriefings(dataDir);
@@ -135,10 +157,20 @@ export function createWebServer(options: WebServerOptions = {}) {
   return {
     app,
     start: () => {
-      return new Promise<void>((resolve) => {
-        app.listen(port, host, () => {
+      return new Promise<void>((resolve, reject) => {
+        const server = app.listen(port, host, () => {
           console.log(`cpulse dashboard running at http://${host}:${port}`);
           resolve();
+        });
+
+        server.on('error', (err: NodeJS.ErrnoException) => {
+          if (err.code === 'EADDRINUSE') {
+            reject(new Error(`Port ${port} is already in use`));
+          } else if (err.code === 'EACCES') {
+            reject(new Error(`Permission denied to bind to port ${port}`));
+          } else {
+            reject(err);
+          }
         });
       });
     },

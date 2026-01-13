@@ -143,6 +143,50 @@ const GCP_TIPS = [
 ];
 
 /**
+ * Check if a pattern match appears inside a loop construct.
+ * Uses a heuristic: finds the match position and checks for enclosing loop.
+ */
+function isPatternInsideLoop(code, patternMatch, loopPattern) {
+    const matchIndex = code.indexOf(patternMatch);
+    if (matchIndex === -1) return false;
+
+    // Find all loop constructs and check if any contains the match
+    const loopMatches = [...code.matchAll(/for\s*\([^)]*\)\s*\{|\.forEach\s*\([^)]*=>\s*\{|\.map\s*\([^)]*=>\s*\{|while\s*\([^)]*\)\s*\{/g)];
+
+    for (const loopMatch of loopMatches) {
+        const loopStart = loopMatch.index;
+        if (loopStart > matchIndex) continue; // Loop starts after match
+
+        // Find the matching closing brace for this loop
+        let braceCount = 1;
+        let searchStart = loopStart + loopMatch[0].length;
+        for (let i = searchStart; i < code.length && braceCount > 0; i++) {
+            if (code[i] === '{') braceCount++;
+            else if (code[i] === '}') braceCount--;
+            if (braceCount === 0 && matchIndex < i) {
+                return true; // Match is inside this loop
+            }
+        }
+    }
+    return false;
+}
+
+/**
+ * Check if a collection query has .limit() in its method chain.
+ */
+function queryHasLimit(code, queryMatch) {
+    const matchIndex = code.indexOf(queryMatch);
+    if (matchIndex === -1) return false;
+
+    // Look for .limit( after the match, before a semicolon or newline
+    const afterMatch = code.substring(matchIndex);
+    const lineEnd = afterMatch.search(/[;\n]/);
+    const relevantPart = lineEnd > 0 ? afterMatch.substring(0, lineEnd) : afterMatch;
+
+    return relevantPart.includes('.limit(');
+}
+
+/**
  * Detect cost patterns from code in session messages.
  */
 export function detectCostPatterns(stack, sessions) {
@@ -166,15 +210,16 @@ export function detectCostPatterns(stack, sessions) {
                     const matches = code.match(pattern.pattern);
                     if (!matches) continue;
 
-                    // Check if pattern requires being in a loop
+                    // Check if pattern requires being in a loop - verify the match is actually inside a loop
                     if (pattern.inLoop) {
-                        const hasLoop = pattern.inLoop.test(code);
-                        if (!hasLoop) continue;
+                        const isInLoop = matches.some(match => isPatternInsideLoop(code, match, pattern.inLoop));
+                        if (!isInLoop) continue;
                     }
 
-                    // Check for missing limit
+                    // Check for missing limit - verify the specific query lacks .limit()
                     if (pattern.noLimit) {
-                        if (code.includes('.limit(')) continue;
+                        const allHaveLimit = matches.every(match => queryHasLimit(code, match));
+                        if (allHaveLimit) continue;
                     }
 
                     detectedPatterns.add(pattern.description);

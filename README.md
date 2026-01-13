@@ -194,15 +194,17 @@ cpulse serve --port 3000
 Install cpulse to `~/.cpulse/bin/` for use outside the source directory:
 
 ```bash
-# Basic installation
+# Install or update (only copies changed files)
 cpulse install
 
-# Overwrite existing installation
+# Force reinstall of npm dependencies
 cpulse install --force
 
 # Also symlink to /usr/local/bin and /usr/local/share/man (requires sudo)
 sudo cpulse install --link
 ```
+
+The install command uses incremental updates - only changed files are copied, and npm dependencies are only reinstalled when package.json changes or `--force` is used.
 
 ## Scheduling
 

@@ -28,22 +28,11 @@ export interface SourcesConfig {
     claude_code: ClaudeCodeSourceConfig;
     github: GitHubSourceConfig;
 }
-export interface EnabledCardsConfig {
-    project_continuity?: boolean;
-    code_review?: boolean;
-    open_questions?: boolean;
-    patterns?: boolean;
-    post_merge_feedback?: boolean;
-    tech_advisory?: boolean;
-    challenge_insights?: boolean;
-    cost_optimization?: boolean;
-}
 export interface PreferencesConfig {
     article_style: 'concise' | 'detailed';
     max_cards: number;
     focus_topics: string[];
     ignored_topics: string[];
-    enabled_cards?: EnabledCardsConfig;
 }
 export interface Config {
     email: EmailConfig;
@@ -78,6 +67,13 @@ export interface ToolCall {
 export interface TodoItem {
     content: string;
     status: 'pending' | 'in_progress' | 'completed';
+    sessionId?: string;
+    project?: string;
+    projectPath?: string;
+    relatedFiles?: string[];
+    firstSeen?: Date;
+    lastSeen?: Date;
+    occurrenceCount?: number;
 }
 export interface GitHubCommit {
     sha: string;
@@ -99,6 +95,10 @@ export interface GitHubPR {
     mergedAt?: Date;
     reviewComments: number;
     isDraft: boolean;
+    ageInDays?: number;
+    urgency?: 'low' | 'medium' | 'high' | 'critical';
+    isReviewRequested?: boolean;
+    reviewAgeInDays?: number;
 }
 export interface PostMergeComment {
     id: number;
@@ -113,6 +113,10 @@ export interface PostMergeComment {
     isReviewComment: boolean;
     path?: string;
     line?: number;
+    severity?: 'critical' | 'suggestion' | 'question' | 'info';
+    severityReason?: string;
+    requiresFollowUp?: boolean;
+    suggestedAction?: string;
 }
 export interface GitHubActivity {
     commits: GitHubCommit[];
@@ -120,8 +124,31 @@ export interface GitHubActivity {
     staleBranches: string[];
     postMergeComments: PostMergeComment[];
 }
+export interface ActionItem {
+    id: string;
+    content: string;
+    category: 'pr_review' | 'todo' | 'post_merge' | 'question' | 'quick_win' | 'blocker';
+    priority: number;
+    source: {
+        type: 'pr' | 'session' | 'comment';
+        ref: string;
+        project?: string;
+    };
+    isStartHere?: boolean;
+    estimatedEffort?: 'trivial' | 'small' | 'medium' | 'large';
+    deepLink?: string;
+    context?: string;
+}
+export interface BlockerInfo {
+    description: string;
+    project: string;
+    sessionId: string;
+    blockedBy?: string;
+    waitingOn?: string;
+    detectedAt: Date;
+}
 export interface ArticleCard {
-    type: 'project_continuity' | 'code_review' | 'learning' | 'open_questions' | 'suggestions' | 'patterns' | 'weekly_summary' | 'post_merge_feedback' | 'tech_advisory' | 'challenge_insights' | 'cost_optimization';
+    type: 'project_continuity' | 'code_review' | 'learning' | 'open_questions' | 'suggestions' | 'patterns' | 'weekly_summary' | 'post_merge_feedback';
     title: string;
     content: string;
     priority: number;
@@ -144,56 +171,10 @@ export interface ExtractedSignals {
         openTodos: TodoItem[];
         unresolvedErrors: string[];
         activeProjects: string[];
+        blockers?: BlockerInfo[];
     };
     github: GitHubActivity;
-}
-export interface TechStack {
-    languages: string[];
-    frameworks: string[];
-    databases: string[];
-    cloudProvider?: 'gcp' | 'aws' | 'azure' | 'other';
-    cloudServices: string[];
-    dependencies: {
-        name: string;
-        version: string;
-    }[];
-    detectedFrom: string[];
-}
-export interface ChallengePattern {
-    category: 'bug' | 'style' | 'security' | 'performance' | 'architecture';
-    description: string;
-    occurrences: number;
-    examples: string[];
-    suggestedFix?: string;
-}
-export interface ChallengeAnalysis {
-    patterns: ChallengePattern[];
-    errorPatterns: {
-        type: string;
-        count: number;
-        examples: string[];
-    }[];
-    analyzedPRs: number;
-    analyzedSessions: number;
-}
-export interface CostInsight {
-    category: 'api' | 'storage' | 'compute' | 'network';
-    pattern: string;
-    impact: 'minor' | 'moderate' | 'significant';
-    suggestion: string;
-    codeLocations?: string[];
-}
-export interface TrendInsight {
-    topic: string;
-    summary: string;
-    relevance: string;
-    sourceUrl?: string;
-    cachedAt: Date;
-}
-export interface TrendsCache {
-    trends: TrendInsight[];
-    stackHash: string;
-    fetchedAt: Date;
-    expiresAt: Date;
+    actionItems?: ActionItem[];
+    quickWins?: ActionItem[];
 }
 //# sourceMappingURL=index.d.ts.map

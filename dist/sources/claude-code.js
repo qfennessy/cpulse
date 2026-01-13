@@ -194,21 +194,55 @@ export function getRecentSessions(config, hoursBack = 168) {
     return sessions;
 }
 export function extractOpenTodos(sessions) {
-    const allTodos = [];
+    // Map to track todos by content, preserving context and tracking recurrence
+    const todoMap = new Map();
     for (const session of sessions) {
+        const sessionTime = session.endTime || session.startTime;
         for (const todo of session.todoItems) {
-            if (todo.status !== 'completed') {
-                allTodos.push(todo);
+            if (todo.status === 'completed')
+                continue;
+            const existing = todoMap.get(todo.content);
+            if (existing) {
+                // Track recurrence - increment count and update last seen
+                existing.occurrenceCount = (existing.occurrenceCount || 1) + 1;
+                if (sessionTime && (!existing.lastSeen || sessionTime > existing.lastSeen)) {
+                    existing.lastSeen = sessionTime;
+                }
+                // Merge related files from this session
+                if (session.filesModified.length > 0) {
+                    const existingFiles = new Set(existing.relatedFiles || []);
+                    for (const file of session.filesModified.slice(0, 5)) {
+                        existingFiles.add(file);
+                    }
+                    existing.relatedFiles = Array.from(existingFiles).slice(0, 10);
+                }
+            }
+            else {
+                // First occurrence - capture full context
+                todoMap.set(todo.content, {
+                    content: todo.content,
+                    status: todo.status,
+                    sessionId: session.id,
+                    project: session.project,
+                    projectPath: session.projectPath,
+                    relatedFiles: session.filesModified.slice(0, 5),
+                    firstSeen: sessionTime,
+                    lastSeen: sessionTime,
+                    occurrenceCount: 1,
+                });
             }
         }
     }
-    // Deduplicate by content
-    const seen = new Set();
-    return allTodos.filter((t) => {
-        if (seen.has(t.content))
-            return false;
-        seen.add(t.content);
-        return true;
+    // Return sorted by recurrence (most recurring first), then by most recent
+    return Array.from(todoMap.values()).sort((a, b) => {
+        // Recurring todos are more important
+        const countDiff = (b.occurrenceCount || 1) - (a.occurrenceCount || 1);
+        if (countDiff !== 0)
+            return countDiff;
+        // Then by most recent
+        const aTime = a.lastSeen?.getTime() || 0;
+        const bTime = b.lastSeen?.getTime() || 0;
+        return bTime - aTime;
     });
 }
 export function extractActiveProjects(sessions) {

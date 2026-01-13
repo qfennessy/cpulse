@@ -36,3 +36,15 @@ export {
   type FeedbackStats,
   type TopicPriority,
 } from './feedback.js';
+
+export {
+  extractBlockers,
+  groupBlockersBySource,
+  formatBlockersForBriefing,
+} from './blockers.js';
+
+export {
+  extractActionItems,
+  extractQuickWins,
+  formatActionItemsForClosing,
+} from './actions.js';

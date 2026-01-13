@@ -3,16 +3,7 @@ import { analyzePatterns, formatPatternSummary, extractAllQuestions, formatQuest
 import { commitLinkWithMessage, prLinkWithTitle, branchCompareLink, } from '../presentation/index.js';
 import { getParentProject, formatProjectWithWorktrees, groupByParentProject, } from '../sources/worktree.js';
 import { loadMemoryContext, formatMemoryForPrompt, } from '../memory/index.js';
-import { detectTechStack, formatTechStack } from '../intelligence/stack-detector.js';
-import { analyzePRChallenges, formatChallengeAnalysis, hasChallengeData } from '../intelligence/pr-analyzer.js';
-import { detectCostPatterns, formatCostInsights, hasCostData } from '../intelligence/cost-patterns.js';
-import { getTrends, formatTrendsForPrompt, buildTrendQueries } from '../intelligence/web-trends.js';
 const BASE_SYSTEM_PROMPT = `You are cpulse, a personal briefing assistant that generates concise, actionable insights from development activity.
-
-IMPORTANT CONTEXT: The user develops exclusively using Claude Code (Anthropic's AI coding assistant). All code is written by Claude Code based on the user's instructions and guidance. When providing advice:
-- Recommendations should be formatted as instructions the user can give to Claude Code
-- For coding practice changes, provide CLAUDE.md-style rules that Claude Code will follow
-- The user directs the work; Claude Code implements it
 
 Your communication style:
 - Direct and technically accurate
@@ -25,7 +16,7 @@ Your communication style:
 
 IMPORTANT: When the input contains markdown links like [text](url), you MUST preserve them exactly in your output. These links make the briefing actionable by letting the user click directly to PRs, commits, and files.
 
-Your goal is to help the user pick up where they left off and stay oriented on their projects.`;
+Your goal is to help the developer pick up where they left off and stay oriented on their projects.`;
 /**
  * Build system prompt with optional memory context.
  * Memory provides project-specific knowledge for more relevant briefings.
@@ -48,48 +39,6 @@ When generating briefings, consider:
 - Known architectural decisions and their rationale
 - Team preferences and established workflows
 - Previous context that might inform current work`;
-}
-
-/**
- * Get the days of the week when a card type should appear (for weekly rotation).
- * Returns null for daily cards, or array of day numbers (0=Sun, 1=Mon, etc.)
- */
-function getWeeklyRotationDays(cardType) {
-    const rotations = {
-        challenge_insights: [1, 2],  // Mon, Tue
-        tech_advisory: [3, 4],       // Wed, Thu
-        cost_optimization: [5],      // Fri
-    };
-    return rotations[cardType] || null;
-}
-
-/**
- * Check if a card type should be generated based on user config, rotation, and feedback.
- * @param {object} options - Options object
- * @param {boolean} options.allCards - If true, bypass weekly rotation check
- */
-function shouldGenerateCard(config, dataDir, cardType, options = {}) {
-    const { allCards = false } = options;
-
-    // Check user config - explicit disable
-    const enabledCards = config.preferences?.enabled_cards || {};
-    if (enabledCards[cardType] === false) {
-        return false;
-    }
-
-    // Check weekly rotation for advisory cards (skip if allCards is true)
-    if (!allCards) {
-        const rotationDays = getWeeklyRotationDays(cardType);
-        if (rotationDays) {
-            const today = new Date().getDay();
-            if (!rotationDays.includes(today)) {
-                return false;
-            }
-        }
-    }
-
-    // Feedback-based exclusion (existing logic)
-    return shouldIncludeCardType(dataDir, cardType);
 }
 function formatSessionSummary(session) {
     // Check if this session is part of a worktree
@@ -443,13 +392,21 @@ Peak working hours: ${peakHours.join(', ')}
 
 Top tools used: ${patterns.toolUsage.slice(0, 5).map((t) => t.tool).join(', ')}
 
-Generate a briefing that:
-1. Highlights interesting patterns in work habits
-2. Notes which projects/files are getting the most attention
-3. Identifies any concerning patterns (e.g., lots of debugging, same files edited repeatedly)
-4. Provides one actionable insight based on the patterns
+Generate a PRESCRIPTIVE briefing that provides SPECIFIC, ACTIONABLE recommendations:
 
-Keep it brief and insightful. Focus on patterns that help the developer understand their work habits.
+1. Identify ONE specific actionable recommendation based on the patterns observed
+2. If same files are edited repeatedly (high churn), suggest: "Consider refactoring [filename] to reduce edit frequency"
+3. If debugging patterns are frequent, suggest: "Add tests for [area] to catch issues earlier"
+4. If work is scattered across many projects, suggest: "Focus today on completing work in [most active project]"
+5. Based on peak hours, suggest optimal time blocks: "Schedule deep work between [peak hours]"
+
+IMPORTANT:
+- Be prescriptive, not just observational
+- Every insight MUST lead to a specific "try this today" action
+- End with a concrete, single-sentence recommendation the developer can act on immediately
+- Do NOT just describe what happened - tell them what to DO about it
+
+Keep it brief (2-3 short paragraphs). Focus on one or two key insights with clear actions.
 Output only the briefing content in markdown format, no preamble.`;
     const response = await client.messages.create({
         model: 'claude-sonnet-4-20250514',
@@ -527,240 +484,6 @@ Output only the briefing content in markdown format, no preamble.`;
         },
     };
 }
-
-export async function generateTechAdvisoryCard(client, stack, trends, config, systemPrompt = BASE_SYSTEM_PROMPT) {
-    // Need a detected stack to provide relevant advice
-    if (stack.languages.length === 0 && stack.frameworks.length === 0) {
-        return null;
-    }
-
-    const stackSummary = formatTechStack(stack);
-    const trendsSummary = formatTrendsForPrompt(trends.trends, stack);
-    const searchQueries = buildTrendQueries(stack);
-
-    const prompt = `Based on this tech stack and recent trends, generate a "Tech Advisory" briefing card.
-
-**Detected Tech Stack:**
-${stackSummary}
-
-**Recent Trends & Best Practices:**
-${trendsSummary}
-
-**Search Queries for Latest Info (if web search available):**
-${searchQueries.join('\n')}
-
-IMPORTANT: The user develops exclusively with Claude Code. All coding is done by Claude Code based on user direction.
-
-Generate an advisory card that:
-1. Focuses on ONE specific, actionable tip relevant to their stack
-2. Includes a production-ready code example
-3. Explains WHY this matters (performance, security, DX, cost)
-4. Provides a CLAUDE.md rule the user can add to enforce this pattern
-
-Format the advice so it's actionable through Claude Code:
-- Main advice as a brief explanation
-- Code example showing the recommended pattern
-- A "Add to CLAUDE.md" section with exact text to copy-paste
-
-The CLAUDE.md section MUST be formatted exactly like this for easy copy-paste:
-
-**Add to CLAUDE.md:**
-\`\`\`
-- when working with Firestore queries, use batch reads (getAll) instead of individual reads in loops
-\`\`\`
-
-Rules should match existing CLAUDE.md style:
-- Start with lowercase (unless proper noun)
-- Imperative form ("use X" not "you should use X")
-- Concise, single-line rules
-- No periods at end
-
-Style: Concise, direct, technically accurate. Include working code.
-Do NOT be generic - make it specific to their exact stack.
-
-Output only the briefing content in markdown format, no preamble.`;
-
-    const response = await client.messages.create({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 1500,
-        system: systemPrompt,
-        messages: [{ role: 'user', content: prompt }],
-    });
-
-    const content = response.content[0];
-    if (!content || content.type !== 'text') return null;
-
-    const lines = content.text.split('\n');
-    let title = 'Tech Advisory';
-    let body = content.text;
-    if (lines[0].startsWith('#')) {
-        title = lines[0].replace(/^#+\s*/, '');
-        body = lines.slice(1).join('\n').trim();
-    }
-
-    return {
-        type: 'tech_advisory',
-        title,
-        content: body,
-        priority: 3,
-        metadata: {
-            stack: stack.languages.concat(stack.frameworks),
-            trendsSource: trends.source,
-        },
-    };
-}
-
-export async function generateChallengeInsightsCard(client, analysis, config, systemPrompt = BASE_SYSTEM_PROMPT) {
-    // Need enough data to provide meaningful insights
-    if (!hasChallengeData(analysis)) {
-        return null;
-    }
-
-    const analysisSummary = formatChallengeAnalysis(analysis);
-
-    const prompt = `Based on this analysis of PR review patterns and errors, generate a "Challenge Insights" briefing card.
-
-**Analysis of Recent PRs and Sessions:**
-${analysisSummary}
-
-IMPORTANT: The user develops exclusively with Claude Code. All coding is done by Claude Code based on user direction. These patterns are being made by Claude Code and need to be addressed through better instructions.
-
-Generate a briefing that:
-1. Identifies the TOP 1-2 recurring patterns causing issues
-2. Provides specific, preventive measures as CLAUDE.md rules
-3. Includes a "before/after" code example showing the fix
-4. Provides a rule for the user to add to their CLAUDE.md to prevent Claude Code from repeating these patterns
-
-Format the output with:
-- Brief description of the pattern/issue
-- Before/after code example
-- An "Add to CLAUDE.md" section with exact text to copy-paste
-
-The CLAUDE.md section MUST be formatted exactly like this for easy copy-paste:
-
-**Add to CLAUDE.md:**
-\`\`\`
-- always add null checks when accessing nested object properties from external data sources
-- when writing async code, ensure all promises have proper error handling with try/catch
-\`\`\`
-
-Rules should match existing CLAUDE.md style:
-- Start with lowercase (unless proper noun)
-- Imperative form ("add X" not "you should add X")
-- Concise, single-line rules
-- No periods at end
-
-Style: Direct and specific. This is about giving Claude Code better instructions.
-Focus on rules that will prevent these patterns in future sessions.
-
-Output only the briefing content in markdown format, no preamble.`;
-
-    const response = await client.messages.create({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 1200,
-        system: systemPrompt,
-        messages: [{ role: 'user', content: prompt }],
-    });
-
-    const content = response.content[0];
-    if (!content || content.type !== 'text') return null;
-
-    const lines = content.text.split('\n');
-    let title = 'Challenge Insights';
-    let body = content.text;
-    if (lines[0].startsWith('#')) {
-        title = lines[0].replace(/^#+\s*/, '');
-        body = lines.slice(1).join('\n').trim();
-    }
-
-    return {
-        type: 'challenge_insights',
-        title,
-        content: body,
-        priority: 2,
-        metadata: {
-            patternCount: analysis.patterns.length,
-            errorCount: analysis.errorPatterns.length,
-            analyzedPRs: analysis.analyzedPRs,
-        },
-    };
-}
-
-export async function generateCostOptimizationCard(client, insights, stack, config, systemPrompt = BASE_SYSTEM_PROMPT) {
-    // Need GCP stack or detected patterns to provide relevant advice
-    if (!hasCostData(insights, stack)) {
-        return null;
-    }
-
-    const insightsSummary = formatCostInsights(insights, stack);
-
-    const prompt = `Based on this GCP usage analysis, generate a "Cost Optimization" briefing card.
-
-**Cloud Stack & Detected Patterns:**
-${insightsSummary}
-
-IMPORTANT: The user develops exclusively with Claude Code. All coding is done by Claude Code based on user direction. Cost inefficiencies should be addressed through better Claude Code instructions.
-
-Generate a briefing that:
-1. Focuses on ONE specific cost optimization opportunity
-2. Estimates potential savings (minor/moderate/significant impact)
-3. Provides a "before/after" code example with implementation guidance
-4. Provides a CLAUDE.md rule to ensure cost-efficient patterns in future code
-
-Format the output with:
-- Brief explanation of the cost issue
-- Before/after code example
-- An "Add to CLAUDE.md" section with exact text to copy-paste
-
-The CLAUDE.md section MUST be formatted exactly like this for easy copy-paste:
-
-**Add to CLAUDE.md:**
-\`\`\`
-- when reading multiple Firestore documents, use batch reads (getAll) instead of individual reads
-- prefer Cloud Run scale-to-zero configurations over always-on instances for non-latency-critical services
-\`\`\`
-
-Rules should match existing CLAUDE.md style:
-- Start with lowercase (unless proper noun)
-- Imperative form ("use X" not "you should use X")
-- Concise, single-line rules
-- No periods at end
-
-Focus on quick wins that Claude Code can implement.
-Be specific to their stack (GCP, Firestore, Cloud Run).
-
-Output only the briefing content in markdown format, no preamble.`;
-
-    const response = await client.messages.create({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 1200,
-        system: systemPrompt,
-        messages: [{ role: 'user', content: prompt }],
-    });
-
-    const content = response.content[0];
-    if (!content || content.type !== 'text') return null;
-
-    const lines = content.text.split('\n');
-    let title = 'Cost Optimization';
-    let body = content.text;
-    if (lines[0].startsWith('#')) {
-        title = lines[0].replace(/^#+\s*/, '');
-        body = lines.slice(1).join('\n').trim();
-    }
-
-    return {
-        type: 'cost_optimization',
-        title,
-        content: body,
-        priority: 4,
-        metadata: {
-            cloudProvider: stack.cloudProvider,
-            insightCount: insights.length,
-        },
-    };
-}
-
 export async function generateBriefing(config, signals, options = {}) {
     const { allCards = false } = options;
     const apiKey = config.anthropic_api_key || process.env.ANTHROPIC_API_KEY;
@@ -770,7 +493,9 @@ export async function generateBriefing(config, signals, options = {}) {
     const client = new Anthropic({ apiKey });
     const dataDir = config.data_dir || `${process.env.HOME}/.cpulse`;
     // Load memory context from active project paths
-    const projectPaths = signals.claudeCode.recentSessions.map((s) => s.projectPath || s.project).filter(Boolean);
+    const projectPaths = signals.claudeCode.recentSessions
+        .map((s) => s.projectPath || s.project)
+        .filter(Boolean);
     const memoryContext = loadMemoryContext(projectPaths);
     // Determine primary project for memory lookup
     const primaryProject = signals.claudeCode.activeProjects[0] || undefined;
@@ -779,74 +504,32 @@ export async function generateBriefing(config, signals, options = {}) {
     // Analyze patterns and extract questions from sessions
     const patterns = analyzePatterns(signals.claudeCode.recentSessions);
     const questions = extractAllQuestions(signals.claudeCode.recentSessions);
-
-    // Detect tech stack for advisory cards
-    const techStack = detectTechStack(projectPaths);
-    const trends = getTrends(techStack);
-
-    // Analyze PR challenges for insights card
-    const challengeAnalysis = analyzePRChallenges(
-        signals.github.postMergeComments,
-        signals.claudeCode.recentSessions
-    );
-
-    // Detect cost optimization patterns
-    const costInsights = detectCostPatterns(techStack, signals.claudeCode.recentSessions);
-
     // Generate cards in parallel
     const cardPromises = [];
-    const cardOpts = { allCards };
-
     // Project Continuity card (from Claude Code sessions)
-    if (config.sources.claude_code.enabled && shouldGenerateCard(config, dataDir, 'project_continuity', cardOpts)) {
+    if (config.sources.claude_code.enabled && (allCards || shouldIncludeCardType(dataDir, 'project_continuity'))) {
         cardPromises.push(generateProjectContinuityCard(client, signals, config, systemPrompt));
     }
     // Code Review card (from GitHub activity)
-    if (config.sources.github.enabled && shouldGenerateCard(config, dataDir, 'code_review', cardOpts)) {
+    if (config.sources.github.enabled && (allCards || shouldIncludeCardType(dataDir, 'code_review'))) {
         cardPromises.push(generateCodeReviewCard(client, signals, config, systemPrompt));
     }
     // Open Questions card (from session analysis)
-    if (config.sources.claude_code.enabled && shouldGenerateCard(config, dataDir, 'open_questions', cardOpts)) {
+    if (config.sources.claude_code.enabled && (allCards || shouldIncludeCardType(dataDir, 'open_questions'))) {
         cardPromises.push(generateOpenQuestionsCard(client, questions, config, systemPrompt));
     }
     // Patterns card (from session analysis)
-    if (config.sources.claude_code.enabled && shouldGenerateCard(config, dataDir, 'patterns', cardOpts)) {
+    if (config.sources.claude_code.enabled && (allCards || shouldIncludeCardType(dataDir, 'patterns'))) {
         cardPromises.push(generatePatternsCard(client, patterns, config, systemPrompt));
     }
     // Post-Merge Feedback card (from GitHub post-merge comments)
-    if (config.sources.github.enabled && shouldGenerateCard(config, dataDir, 'post_merge_feedback', cardOpts)) {
+    if (config.sources.github.enabled && (allCards || shouldIncludeCardType(dataDir, 'post_merge_feedback'))) {
         cardPromises.push(generatePostMergeFeedbackCard(client, signals.github.postMergeComments, config, systemPrompt));
-    }
-    // Tech Advisory card (Wed/Thu - stack-aware architectural advice)
-    if (shouldGenerateCard(config, dataDir, 'tech_advisory', cardOpts)) {
-        cardPromises.push(generateTechAdvisoryCard(client, techStack, trends, config, systemPrompt));
-    }
-    // Challenge Insights card (Mon/Tue - PR pattern analysis)
-    if (shouldGenerateCard(config, dataDir, 'challenge_insights', cardOpts)) {
-        cardPromises.push(generateChallengeInsightsCard(client, challengeAnalysis, config, systemPrompt));
-    }
-    // Cost Optimization card (Fri - GCP cost tips)
-    if (shouldGenerateCard(config, dataDir, 'cost_optimization', cardOpts)) {
-        cardPromises.push(generateCostOptimizationCard(client, costInsights, techStack, config, systemPrompt));
     }
     const cardResults = await Promise.all(cardPromises);
     const cards = cardResults.filter((c) => c !== null);
-    // Sort by config order (enabled_cards key order), then by priority as fallback
-    const enabledCards = config.preferences?.enabled_cards || {};
-    const cardOrder = Object.keys(enabledCards);
-    cards.sort((a, b) => {
-        const aIndex = cardOrder.indexOf(a.type);
-        const bIndex = cardOrder.indexOf(b.type);
-        // If both in config, use config order
-        if (aIndex !== -1 && bIndex !== -1) {
-            return aIndex - bIndex;
-        }
-        // If only one in config, it comes first
-        if (aIndex !== -1) return -1;
-        if (bIndex !== -1) return 1;
-        // Neither in config, fall back to priority
-        return a.priority - b.priority;
-    });
+    // Sort by priority
+    cards.sort((a, b) => a.priority - b.priority);
     // Limit to max_cards
     const limitedCards = cards.slice(0, config.preferences.max_cards);
     const briefing = {

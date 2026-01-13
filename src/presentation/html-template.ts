@@ -60,16 +60,28 @@ export function markdownToEmailHtml(markdown: string): string {
   html = html.replace(/^## (.+)$/gm, '<h2 style="margin:24px 0 12px;font-size:18px;font-weight:600;color:#1a1a1a;">$1</h2>');
   html = html.replace(/^# (.+)$/gm, '<h1 style="margin:28px 0 16px;font-size:22px;font-weight:700;color:#1a1a1a;">$1</h1>');
 
-  // Convert list items with distinct markers
-  html = html.replace(/^\d+\. (.+)$/gm, '<li data-ol style="margin:8px 0;color:#333;">$1</li>');
-  html = html.replace(/^- (.+)$/gm, '<li data-ul style="margin:8px 0;color:#333;">$1</li>');
+  // Process lists first - extract, clean, and isolate them from paragraph processing
+  // Step 1: Convert list items to <li> tags with markers
+  html = html.replace(/^\d+\. (.+)$/gm, '%%%OL_ITEM%%%<li style="margin:8px 0;color:#333;">$1</li>');
+  html = html.replace(/^- (.+)$/gm, '%%%UL_ITEM%%%<li style="margin:8px 0;color:#333;">$1</li>');
 
-  // Wrap each list type separately
-  html = html.replace(/(<li data-ol[^>]*>.*<\/li>\n?)+/g, '<ol style="margin:16px 0;padding-left:24px;">$&</ol>');
-  html = html.replace(/(<li data-ul[^>]*>.*<\/li>\n?)+/g, '<ul style="margin:16px 0;padding-left:24px;">$&</ul>');
+  // Step 2: Group consecutive list items and wrap in <ul>/<ol>
+  // Use markers to identify list type, collapse whitespace between items
+  html = html.replace(/(%%%OL_ITEM%%%<li[^>]*>.*?<\/li>[\s\n]*)+/g, (match) => {
+    const items = match.replace(/%%%OL_ITEM%%%/g, '').replace(/<\/li>[\s\n]+<li/g, '</li><li');
+    return `<ol style="margin:16px 0;padding-left:24px;">${items.trim()}</ol>\n\n`;
+  });
+  html = html.replace(/(%%%UL_ITEM%%%<li[^>]*>.*?<\/li>[\s\n]*)+/g, (match) => {
+    const items = match.replace(/%%%UL_ITEM%%%/g, '').replace(/<\/li>[\s\n]+<li/g, '</li><li');
+    return `<ul style="margin:16px 0;padding-left:24px;">${items.trim()}</ul>\n\n`;
+  });
 
-  // Clean up data attributes
-  html = html.replace(/ data-ol| data-ul/g, '');
+  // Step 3: Protect lists from paragraph processing with placeholders
+  const lists: string[] = [];
+  html = html.replace(/<[uo]l[^>]*>[\s\S]*?<\/[uo]l>/g, (match) => {
+    lists.push(match);
+    return `%%%LIST_${lists.length - 1}%%%`;
+  });
 
   // Paragraphs (double newlines)
   html = html.replace(/\n\n/g, '</p><p style="margin:16px 0;line-height:1.7;color:#333;">');
@@ -80,9 +92,19 @@ export function markdownToEmailHtml(markdown: string): string {
   // Wrap in paragraph
   html = `<p style="margin:16px 0;line-height:1.7;color:#333;">${html}</p>`;
 
+  // Restore lists
+  html = html.replace(/%%%LIST_(\d+)%%%/g, (_, index) => lists[parseInt(index, 10)]);
+
   // Clean up empty paragraphs
   html = html.replace(/<p[^>]*><\/p>/g, '');
   html = html.replace(/<p[^>]*><br><\/p>/g, '');
+
+  // Fix invalid HTML structure around lists (paragraphs shouldn't wrap lists)
+  html = html.replace(/<p[^>]*>(<[uo]l)/g, '$1');  // Remove <p> directly before list start
+  html = html.replace(/(<br>)(<[uo]l)/g, '</p>$2'); // Close paragraph before list if there's preceding content
+  html = html.replace(/(<\/[uo]l>)<\/p>(<p)/g, '$1$2'); // Keep <p> that starts next paragraph
+  html = html.replace(/(<\/[uo]l>)<\/p>/g, '$1'); // Remove orphaned </p> after list end
+  html = html.replace(/(<\/[uo]l>)(<br>)+/g, '$1'); // Remove <br> after list end
 
   return html;
 }

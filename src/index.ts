@@ -13,6 +13,11 @@ import {
   formatBriefingWithNarratives,
 } from './delivery/email.js';
 import { saveBriefing, getLatestBriefing } from './storage/briefings.js';
+import {
+  extractBlockers,
+  extractActionItems,
+  extractQuickWins,
+} from './intelligence/index.js';
 
 export async function collectSignals(
   config: Config,
@@ -40,6 +45,7 @@ export async function collectSignals(
     signals.claudeCode.openTodos = extractOpenTodos(sessions);
     signals.claudeCode.activeProjects = extractActiveProjects(sessions);
     signals.claudeCode.unresolvedErrors = extractUnresolvedErrors(sessions);
+    signals.claudeCode.blockers = extractBlockers(sessions);
   }
 
   // Collect GitHub signals
@@ -57,22 +63,30 @@ export interface GenerateBriefingResult {
 
 export async function generateAndSendBriefing(
   config: Config,
-  options: { send?: boolean; save?: boolean; hoursBack?: number } = {}
+  options: { send?: boolean; save?: boolean; hoursBack?: number; allCards?: boolean } = {}
 ): Promise<GenerateBriefingResult> {
-  const { send = true, save = true, hoursBack = 168 } = options;
+  const { send = true, save = true, hoursBack = 168, allCards = false } = options;
 
   // Collect signals
   const signals = await collectSignals(config, hoursBack);
 
+  // Extract action items and quick wins for actionable closing
+  const actionItems = extractActionItems(signals);
+  const quickWins = extractQuickWins(signals);
+
+  // Store in signals for downstream use
+  signals.actionItems = actionItems;
+  signals.quickWins = quickWins;
+
   // Generate briefing
-  const briefing = await generateBriefing(config, signals);
+  const briefing = await generateBriefing(config, signals, { allCards });
 
   // Save briefing
   if (save && config.data_dir) {
     saveBriefing(config.data_dir, briefing);
   }
 
-  // Send email with enhanced presentation (includes narratives)
+  // Send email with enhanced presentation (includes narratives and action items)
   if (send) {
     await sendBriefingEmail(config.email, briefing, signals);
   }
@@ -87,7 +101,12 @@ export {
   getConfigPath,
 } from './config.js';
 
-export { formatBriefingAsMarkdown, formatBriefingWithNarratives } from './delivery/email.js';
+export {
+  formatBriefingAsMarkdown,
+  formatBriefingWithNarratives,
+  formatBriefingForTerminal,
+  formatBriefingAsTerminal,
+} from './delivery/email.js';
 export { getLatestBriefing, loadBriefings, getBriefingStats } from './storage/briefings.js';
 
 // Presentation module exports

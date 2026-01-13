@@ -8,9 +8,10 @@ export declare function generateAndSendBriefing(config: Config, options?: {
     send?: boolean;
     save?: boolean;
     hoursBack?: number;
+    allCards?: boolean;
 }): Promise<GenerateBriefingResult>;
 export { loadConfig, createDefaultConfig, configExists, getConfigPath, } from './config.js';
-export { formatBriefingAsMarkdown, formatBriefingWithNarratives } from './delivery/email.js';
+export { formatBriefingAsMarkdown, formatBriefingWithNarratives, formatBriefingForTerminal, formatBriefingAsTerminal, } from './delivery/email.js';
 export { getLatestBriefing, loadBriefings, getBriefingStats } from './storage/briefings.js';
 export { prLink, commitLink, fileLink, fileLinkWithLine, branchCompareLink, formatPRList, formatCommitList, wrapWithNarratives, formatBriefingWithNarratives as formatWithNarratives, renderBriefingHtml, } from './presentation/index.js';
 export { isWorktree, getMainRepoPath, getParentProject, groupByParentProject, formatProjectWithWorktrees, } from './sources/worktree.js';

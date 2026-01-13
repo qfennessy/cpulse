@@ -1,6 +1,6 @@
 {
   "name": "cpulse",
-  "version": "0.7.0",
+  "version": "0.9.0",
   "description": "Commit Pulse - Personal daily briefings from Claude Code sessions and GitHub activity",
   "type": "module",
   "engines": {
@@ -18,7 +18,11 @@
     "generate": "node dist/cli.js generate",
     "dev": "tsx src/cli.ts",
     "preview": "tsx src/cli.ts preview",
-    "test": "vitest"
+    "test": "vitest run",
+    "link": "npm run build && npm link && npm run install:man",
+    "unlink": "npm unlink -g cpulse && npm run uninstall:man",
+    "install:man": "mkdir -p /usr/local/share/man/man1 && cp man/cpulse.1 /usr/local/share/man/man1/",
+    "uninstall:man": "rm -f /usr/local/share/man/man1/cpulse.1"
   },
   "keywords": [
     "briefings",

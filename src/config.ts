@@ -66,7 +66,8 @@ export function loadConfig(): Config {
   }
 
   const fileContents = readFileSync(CONFIG_FILE, 'utf8');
-  const userConfig = yaml.load(fileContents) as Partial<Config>;
+  // yaml.load returns undefined for empty files or files with only comments
+  const userConfig = (yaml.load(fileContents) as Partial<Config>) || {};
 
   // Deep merge with defaults
   const config: Config = {
@@ -74,31 +75,31 @@ export function loadConfig(): Config {
     ...userConfig,
     email: {
       ...DEFAULT_CONFIG.email,
-      ...userConfig.email,
+      ...userConfig?.email,
       smtp: {
         ...DEFAULT_CONFIG.email.smtp,
-        ...userConfig.email?.smtp,
+        ...userConfig?.email?.smtp,
         auth: {
           ...DEFAULT_CONFIG.email.smtp.auth,
-          ...userConfig.email?.smtp?.auth,
+          ...userConfig?.email?.smtp?.auth,
         },
       },
     },
     sources: {
       ...DEFAULT_CONFIG.sources,
-      ...userConfig.sources,
+      ...userConfig?.sources,
       claude_code: {
         ...DEFAULT_CONFIG.sources.claude_code,
-        ...userConfig.sources?.claude_code,
+        ...userConfig?.sources?.claude_code,
       },
       github: {
         ...DEFAULT_CONFIG.sources.github,
-        ...userConfig.sources?.github,
+        ...userConfig?.sources?.github,
       },
     },
     preferences: {
       ...DEFAULT_CONFIG.preferences,
-      ...userConfig.preferences,
+      ...userConfig?.preferences,
     },
   };
 

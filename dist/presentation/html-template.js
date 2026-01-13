@@ -43,13 +43,15 @@ export function markdownToEmailHtml(markdown) {
     html = html.replace(/^## (.+)$/gm, '<h2 style="margin:24px 0 12px;font-size:18px;font-weight:600;color:#1a1a1a;">$1</h2>');
     html = html.replace(/^# (.+)$/gm, '<h1 style="margin:28px 0 16px;font-size:22px;font-weight:700;color:#1a1a1a;">$1</h1>');
     // Convert list items with distinct markers (tight spacing for better readability)
-    html = html.replace(/^\d+\. (.+)$/gm, '<li data-ol style="margin:2px 0;color:#333;">$1</li>');
-    html = html.replace(/^- (.+)$/gm, '<li data-ul style="margin:2px 0;color:#333;">$1</li>');
-    // Wrap each list type separately
-    html = html.replace(/(<li data-ol[^>]*>.*<\/li>\n?)+/g, '<ol style="margin:12px 0;padding-left:24px;">$&</ol>');
-    html = html.replace(/(<li data-ul[^>]*>.*<\/li>\n?)+/g, '<ul style="margin:12px 0;padding-left:24px;">$&</ul>');
+    html = html.replace(/^\d+\. (.+)$/gm, '<li data-ol style="margin:0;padding:1px 0;color:#333;">$1</li>');
+    html = html.replace(/^- (.+)$/gm, '<li data-ul style="margin:0;padding:1px 0;color:#333;">$1</li>');
+    // Wrap each list type separately (tight margins, no extra spacing)
+    html = html.replace(/(<li data-ol[^>]*>.*<\/li>\n?)+/g, '<ol style="margin:8px 0;padding-left:24px;line-height:1.4;">$&</ol>');
+    html = html.replace(/(<li data-ul[^>]*>.*<\/li>\n?)+/g, '<ul style="margin:8px 0;padding-left:24px;line-height:1.4;">$&</ul>');
     // Clean up data attributes
     html = html.replace(/ data-ol| data-ul/g, '');
+    // Remove any newlines between list items (they cause extra <br> later)
+    html = html.replace(/<\/li>\n+<li/g, '</li><li');
     // Paragraphs (double newlines)
     html = html.replace(/\n\n/g, '</p><p style="margin:16px 0;line-height:1.7;color:#333;">');
     // Single newlines to <br>

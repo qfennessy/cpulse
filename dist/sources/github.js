@@ -1,4 +1,35 @@
 import { Octokit } from 'octokit';
+
+// Cache for repo list to avoid repeated API calls
+let cachedRepos = null;
+let cacheTimestamp = 0;
+const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
+/**
+ * Check if an error is a GitHub rate limit error.
+ */
+function isRateLimitError(error) {
+    const message = error?.message || error?.toString() || '';
+    return message.includes('rate limit') ||
+           message.includes('quota exhausted') ||
+           message.includes('API rate limit') ||
+           error?.status === 403 ||
+           error?.status === 429;
+}
+
+/**
+ * Log rate limit warning (only once per session).
+ */
+let rateLimitWarned = false;
+function warnRateLimit(context) {
+    if (!rateLimitWarned) {
+        console.warn(`⚠️  GitHub API rate limit reached. Some data may be incomplete.`);
+        console.warn(`   Context: ${context}`);
+        console.warn(`   Try again later or specify repos in config to reduce API calls.`);
+        rateLimitWarned = true;
+    }
+}
+
 export async function createGitHubClient(config) {
     const token = config.token || process.env.GITHUB_PERSONAL_ACCESS_TOKEN || process.env.GITHUB_TOKEN;
     if (!token) {
@@ -6,19 +37,47 @@ export async function createGitHubClient(config) {
     }
     return new Octokit({ auth: token });
 }
-export async function getRecentCommits(octokit, config, hoursBack = 168) {
-    const since = new Date(Date.now() - hoursBack * 60 * 60 * 1000).toISOString();
-    const commits = [];
-    // Get repos to check
-    let repos = config.repos;
-    if (!repos || repos.length === 0) {
-        // Fetch all repos the user has access to
+
+/**
+ * Get repos from config or fetch from API (with caching).
+ */
+async function getRepoList(octokit, config) {
+    // Use configured repos if available
+    if (config.repos && config.repos.length > 0) {
+        return config.repos;
+    }
+
+    // Check cache
+    if (cachedRepos && (Date.now() - cacheTimestamp) < CACHE_TTL) {
+        return cachedRepos;
+    }
+
+    // Fetch from API
+    try {
         const { data: userRepos } = await octokit.rest.repos.listForAuthenticatedUser({
             sort: 'pushed',
             per_page: 50,
             visibility: config.include_private ? 'all' : 'public',
         });
-        repos = userRepos.map((r) => r.full_name);
+        cachedRepos = userRepos.map((r) => r.full_name);
+        cacheTimestamp = Date.now();
+        return cachedRepos;
+    } catch (error) {
+        if (isRateLimitError(error)) {
+            warnRateLimit('fetching repo list');
+            // Return cached repos if available, otherwise empty
+            return cachedRepos || [];
+        }
+        throw error;
+    }
+}
+export async function getRecentCommits(octokit, config, hoursBack = 168) {
+    const since = new Date(Date.now() - hoursBack * 60 * 60 * 1000).toISOString();
+    const commits = [];
+    // Get repos to check (uses cached list)
+    const repos = await getRepoList(octokit, config);
+    if (repos.length === 0) {
+        return commits;
     }
     for (const repoFullName of repos) {
         const [owner, repo] = repoFullName.split('/');
@@ -71,16 +130,8 @@ export async function getRecentCommits(octokit, config, hoursBack = 168) {
 }
 export async function getOpenPullRequests(octokit, config) {
     const pullRequests = [];
-    // Get repos to check
-    let repos = config.repos;
-    if (!repos || repos.length === 0) {
-        const { data: userRepos } = await octokit.rest.repos.listForAuthenticatedUser({
-            sort: 'pushed',
-            per_page: 50,
-            visibility: config.include_private ? 'all' : 'public',
-        });
-        repos = userRepos.map((r) => r.full_name);
-    }
+    // Get repos to check (uses cached list)
+    const repos = await getRepoList(octokit, config);
     // Also get PRs where user is requested reviewer
     // Using octokit.request directly to avoid deprecation warning on the wrapper method
     try {
@@ -136,14 +187,10 @@ export async function getOpenPullRequests(octokit, config) {
 export async function getStaleBranches(octokit, config, daysStale = 14) {
     const staleBranches = [];
     const staleDate = new Date(Date.now() - daysStale * 24 * 60 * 60 * 1000);
-    let repos = config.repos;
-    if (!repos || repos.length === 0) {
-        const { data: userRepos } = await octokit.rest.repos.listForAuthenticatedUser({
-            sort: 'pushed',
-            per_page: 20,
-            visibility: config.include_private ? 'all' : 'public',
-        });
-        repos = userRepos.map((r) => r.full_name);
+    // Get repos to check (uses cached list)
+    const repos = await getRepoList(octokit, config);
+    if (repos.length === 0) {
+        return staleBranches;
     }
     for (const repoFullName of repos.slice(0, 10)) {
         const [owner, repo] = repoFullName.split('/');
@@ -191,14 +238,10 @@ export async function getStaleBranches(octokit, config, daysStale = 14) {
 export async function getPostMergeComments(octokit, config, daysBack = 14) {
     const postMergeComments = [];
     const since = new Date(Date.now() - daysBack * 24 * 60 * 60 * 1000);
-    let repos = config.repos;
-    if (!repos || repos.length === 0) {
-        const { data: userRepos } = await octokit.rest.repos.listForAuthenticatedUser({
-            sort: 'pushed',
-            per_page: 20,
-            visibility: config.include_private ? 'all' : 'public',
-        });
-        repos = userRepos.map((r) => r.full_name);
+    // Get repos to check (uses cached list)
+    const repos = await getRepoList(octokit, config);
+    if (repos.length === 0) {
+        return postMergeComments;
     }
     for (const repoFullName of repos.slice(0, 10)) {
         const [owner, repo] = repoFullName.split('/');
@@ -297,13 +340,36 @@ export async function getGitHubActivity(config, hoursBack = 168) {
     if (!config.enabled) {
         return { commits: [], pullRequests: [], staleBranches: [], postMergeComments: [] };
     }
+
+    // Reset rate limit warning for new session
+    rateLimitWarned = false;
+
     const octokit = await createGitHubClient(config);
-    const [commits, pullRequests, staleBranches, postMergeComments] = await Promise.all([
+
+    // Pre-fetch repo list once (will be cached for all subsequent calls)
+    await getRepoList(octokit, config);
+
+    // Run all fetches in parallel, catching rate limit errors individually
+    const results = await Promise.allSettled([
         getRecentCommits(octokit, config, hoursBack),
         getOpenPullRequests(octokit, config),
         getStaleBranches(octokit, config),
         getPostMergeComments(octokit, config),
     ]);
+
+    // Extract results, using empty arrays for failed requests
+    const commits = results[0].status === 'fulfilled' ? results[0].value : [];
+    const pullRequests = results[1].status === 'fulfilled' ? results[1].value : [];
+    const staleBranches = results[2].status === 'fulfilled' ? results[2].value : [];
+    const postMergeComments = results[3].status === 'fulfilled' ? results[3].value : [];
+
+    // Log any non-rate-limit errors
+    for (const result of results) {
+        if (result.status === 'rejected' && !isRateLimitError(result.reason)) {
+            console.error('GitHub API error:', result.reason?.message || result.reason);
+        }
+    }
+
     return { commits, pullRequests, staleBranches, postMergeComments };
 }
 //# sourceMappingURL=github.js.map

@@ -340,6 +340,17 @@ Next steps:
 
 ### Phase 3: Enhanced Presentation
 
+**Worktree Recognition:**
+- Detect git worktrees and associate with parent project
+- Example: `cocos-story-gemini-live` → parent `cocos-story`
+- Detection methods:
+  - Parse `.git` file (worktrees have a file, not a directory, pointing to main repo)
+  - Check `git worktree list` output
+  - Fall back to naming convention heuristics (prefix matching)
+- Aggregate patterns across all worktrees of a project
+- Show worktree activity grouped under main project in briefings
+- Link to correct branch/worktree in GitHub URLs
+
 **Clickable Links & Deep Links:**
 - GitHub PR links: `repo#123` → `https://github.com/owner/repo/pull/123`
 - Commit links: `abc1234` → `https://github.com/owner/repo/commit/abc1234`

@@ -113,8 +113,9 @@ export async function getOpenPullRequests(
   }
 
   // Also get PRs where user is requested reviewer
+  // Using octokit.request directly to avoid deprecation warning on the wrapper method
   try {
-    const { data: reviewRequests } = await octokit.rest.search.issuesAndPullRequests({
+    const { data: reviewRequests } = await octokit.request('GET /search/issues', {
       q: 'is:pr is:open review-requested:@me',
       per_page: 20,
     });
@@ -138,7 +139,7 @@ export async function getOpenPullRequests(
 
   // Get user's own PRs
   try {
-    const { data: myPRs } = await octokit.rest.search.issuesAndPullRequests({
+    const { data: myPRs } = await octokit.request('GET /search/issues', {
       q: 'is:pr is:open author:@me',
       per_page: 20,
     });

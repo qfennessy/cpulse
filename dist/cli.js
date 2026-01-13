@@ -662,20 +662,40 @@ program
         console.log(`  export MANPATH="${path.join(homeDir, '.cpulse', 'man')}:$MANPATH"`);
 
         if (options.link) {
-            const linkPath = '/usr/local/bin/cpulse';
-            console.log(`\nCreating symlink at ${linkPath}...`);
-            console.log('Note: This may require sudo. If it fails, run:');
-            console.log(`  sudo ln -sf ${cliPath} ${linkPath}`);
+            const binLinkPath = '/usr/local/bin/cpulse';
+            const manLinkDir = '/usr/local/share/man/man1';
+            const manLinkPath = path.join(manLinkDir, 'cpulse.1');
+
+            console.log(`\nCreating symlinks (may require sudo)...`);
+
+            // Symlink the CLI
             try {
-                if (fs.existsSync(linkPath)) {
-                    fs.unlinkSync(linkPath);
+                if (fs.existsSync(binLinkPath)) {
+                    fs.unlinkSync(binLinkPath);
                 }
-                fs.symlinkSync(cliPath, linkPath);
-                console.log('✓ Symlink created successfully!');
+                fs.symlinkSync(cliPath, binLinkPath);
+                console.log(`✓ ${binLinkPath} -> ${cliPath}`);
             } catch (linkError) {
-                console.error(`\nFailed to create symlink: ${linkError.message}`);
-                console.log('Run with sudo:');
-                console.log(`  sudo ln -sf ${cliPath} ${linkPath}`);
+                console.error(`✗ Failed to create ${binLinkPath}: ${linkError.message}`);
+                console.log(`  Run: sudo ln -sf ${cliPath} ${binLinkPath}`);
+            }
+
+            // Symlink the man page
+            if (fs.existsSync(manPageDest)) {
+                try {
+                    // Ensure man directory exists
+                    if (!fs.existsSync(manLinkDir)) {
+                        fs.mkdirSync(manLinkDir, { recursive: true });
+                    }
+                    if (fs.existsSync(manLinkPath)) {
+                        fs.unlinkSync(manLinkPath);
+                    }
+                    fs.symlinkSync(manPageDest, manLinkPath);
+                    console.log(`✓ ${manLinkPath} -> ${manPageDest}`);
+                } catch (linkError) {
+                    console.error(`✗ Failed to create ${manLinkPath}: ${linkError.message}`);
+                    console.log(`  Run: sudo ln -sf ${manPageDest} ${manLinkPath}`);
+                }
             }
         }
     }

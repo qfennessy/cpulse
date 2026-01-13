@@ -200,8 +200,8 @@ cpulse install
 # Overwrite existing installation
 cpulse install --force
 
-# Also create symlink in /usr/local/bin (requires sudo)
-cpulse install --link
+# Also symlink to /usr/local/bin and /usr/local/share/man (requires sudo)
+sudo cpulse install --link
 ```
 
 ## Scheduling

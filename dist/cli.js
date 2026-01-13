@@ -617,9 +617,25 @@ program
         const __dirname = path.dirname(__filename);
         const srcDir = __dirname;
 
+        // Detect if running from installed location
+        const cpulseDir = path.join(homeDir, '.cpulse');
+        if (srcDir.startsWith(cpulseDir)) {
+            console.error('Error: Cannot update from installed location.');
+            console.error('To update cpulse, run the install command from the source repository:');
+            console.error('  cd /path/to/cpulse && node dist/cli.js install');
+            process.exit(1);
+        }
+
         // Find root package.json (one level up from dist/)
         const rootDir = path.dirname(srcDir);
         const packageJsonPath = path.join(rootDir, 'package.json');
+
+        // Verify we're running from a valid source directory
+        if (!fs.existsSync(packageJsonPath)) {
+            console.error('Error: Cannot find package.json in parent directory.');
+            console.error('The install command must be run from the source repository dist/ directory.');
+            process.exit(1);
+        }
         const destPackageJsonPath = path.join(installDir, 'package.json');
 
         const isNewInstall = !fs.existsSync(installDir);

@@ -446,7 +446,7 @@ program
   .command('serve')
   .description('Start the web dashboard')
   .option('-p, --port <port>', 'Port to run on', '3000')
-  .option('-h, --host <host>', 'Host to bind to', 'localhost')
+  .option('-H, --host <host>', 'Host to bind to', 'localhost')
   .action(async (options) => {
     try {
       const port = parseInt(options.port, 10);

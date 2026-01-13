@@ -1,6 +1,6 @@
 # Commit Pulse
 
-Personal daily briefings from your Claude Code sessions and GitHub activity.
+Commit Pulse - Wake up to a daily briefing of your dev activity. Parses Claude Code sessions + GitHub to surface open todos, stale PRs, post-merge feedback, and AI-powered advice formatted as CLAUDE.md rules. Your morning coffee companion for staying oriented. ☕
 
 Commit Pulse analyzes your development activity over the past week and generates concise, actionable briefings delivered to your email each morning.
 

@@ -79,3 +79,22 @@ export {
 
 export { formatBriefingAsMarkdown } from './delivery/email.js';
 export { getLatestBriefing, loadBriefings, getBriefingStats } from './storage/briefings.js';
+
+// Intelligence module exports
+export {
+  analyzePatterns,
+  formatPatternSummary,
+  extractAllQuestions,
+  formatQuestionsForBriefing,
+  saveFeedback,
+  loadFeedback,
+  computeFeedbackStats,
+  recordBriefingFeedback,
+  loadTopicPriorities,
+  updateTopicPriority,
+  type PatternAnalysis,
+  type OpenQuestion,
+  type FeedbackEntry,
+  type FeedbackStats,
+  type TopicPriority,
+} from './intelligence/index.js';

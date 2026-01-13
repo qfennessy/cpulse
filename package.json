@@ -1,0 +1,37 @@
+{
+  "name": "cpulse",
+  "version": "0.6.0",
+  "description": "Commit Pulse - Personal daily briefings from Claude Code sessions and GitHub activity",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "bin": {
+    "cpulse": "dist/cli.js"
+  },
+  "scripts": {
+    "cpulse": "node dist/cli.js",
+    "start": "node dist/cli.js serve",
+    "generate": "node dist/cli.js generate"
+  },
+  "keywords": [
+    "briefings",
+    "claude",
+    "github",
+    "developer-tools",
+    "productivity"
+  ],
+  "author": "Quentin Fennessy",
+  "license": "MIT",
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.39.0",
+    "commander": "^12.1.0",
+    "express": "^4.21.2",
+    "js-yaml": "^4.1.0",
+    "marked": "^15.0.6",
+    "nodemailer": "^6.10.0",
+    "octokit": "^4.1.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

@@ -9,6 +9,11 @@ import { detectCostPatterns, formatCostInsights, hasCostData } from '../intellig
 import { getTrends, formatTrendsForPrompt, buildTrendQueries } from '../intelligence/web-trends.js';
 const BASE_SYSTEM_PROMPT = `You are cpulse, a personal briefing assistant that generates concise, actionable insights from development activity.
 
+IMPORTANT CONTEXT: The user develops exclusively using Claude Code (Anthropic's AI coding assistant). All code is written by Claude Code based on the user's instructions and guidance. When providing advice:
+- Recommendations should be formatted as instructions the user can give to Claude Code
+- For coding practice changes, provide CLAUDE.md-style rules that Claude Code will follow
+- The user directs the work; Claude Code implements it
+
 Your communication style:
 - Direct and technically accurate
 - Concise (2-5 sentences per section)
@@ -20,7 +25,7 @@ Your communication style:
 
 IMPORTANT: When the input contains markdown links like [text](url), you MUST preserve them exactly in your output. These links make the briefing actionable by letting the user click directly to PRs, commits, and files.
 
-Your goal is to help the developer pick up where they left off and stay oriented on their projects.`;
+Your goal is to help the user pick up where they left off and stay oriented on their projects.`;
 /**
  * Build system prompt with optional memory context.
  * Memory provides project-specific knowledge for more relevant briefings.
@@ -544,11 +549,31 @@ ${trendsSummary}
 **Search Queries for Latest Info (if web search available):**
 ${searchQueries.join('\n')}
 
+IMPORTANT: The user develops exclusively with Claude Code. All coding is done by Claude Code based on user direction.
+
 Generate an advisory card that:
 1. Focuses on ONE specific, actionable tip relevant to their stack
-2. Includes a production-ready code example they can use today
+2. Includes a production-ready code example
 3. Explains WHY this matters (performance, security, DX, cost)
-4. Is written like a senior engineer sharing a tip, not a tutorial
+4. Provides a CLAUDE.md rule the user can add to enforce this pattern
+
+Format the advice so it's actionable through Claude Code:
+- Main advice as a brief explanation
+- Code example showing the recommended pattern
+- A "Add to CLAUDE.md" section with exact text to copy-paste
+
+The CLAUDE.md section MUST be formatted exactly like this for easy copy-paste:
+
+**Add to CLAUDE.md:**
+\`\`\`
+- when working with Firestore queries, use batch reads (getAll) instead of individual reads in loops
+\`\`\`
+
+Rules should match existing CLAUDE.md style:
+- Start with lowercase (unless proper noun)
+- Imperative form ("use X" not "you should use X")
+- Concise, single-line rules
+- No periods at end
 
 Style: Concise, direct, technically accurate. Include working code.
 Do NOT be generic - make it specific to their exact stack.
@@ -598,14 +623,35 @@ export async function generateChallengeInsightsCard(client, analysis, config, sy
 **Analysis of Recent PRs and Sessions:**
 ${analysisSummary}
 
+IMPORTANT: The user develops exclusively with Claude Code. All coding is done by Claude Code based on user direction. These patterns are being made by Claude Code and need to be addressed through better instructions.
+
 Generate a briefing that:
 1. Identifies the TOP 1-2 recurring patterns causing issues
-2. Provides specific, preventive measures
+2. Provides specific, preventive measures as CLAUDE.md rules
 3. Includes a "before/after" code example showing the fix
-4. Suggests a PR checklist item to prevent future occurrences
+4. Provides a rule for the user to add to their CLAUDE.md to prevent Claude Code from repeating these patterns
 
-Style: Direct and specific. This is about preventing recurring issues, not lecturing.
-Focus on quick wins that take <10 minutes to implement.
+Format the output with:
+- Brief description of the pattern/issue
+- Before/after code example
+- An "Add to CLAUDE.md" section with exact text to copy-paste
+
+The CLAUDE.md section MUST be formatted exactly like this for easy copy-paste:
+
+**Add to CLAUDE.md:**
+\`\`\`
+- always add null checks when accessing nested object properties from external data sources
+- when writing async code, ensure all promises have proper error handling with try/catch
+\`\`\`
+
+Rules should match existing CLAUDE.md style:
+- Start with lowercase (unless proper noun)
+- Imperative form ("add X" not "you should add X")
+- Concise, single-line rules
+- No periods at end
+
+Style: Direct and specific. This is about giving Claude Code better instructions.
+Focus on rules that will prevent these patterns in future sessions.
 
 Output only the briefing content in markdown format, no preamble.`;
 
@@ -653,13 +699,34 @@ export async function generateCostOptimizationCard(client, insights, stack, conf
 **Cloud Stack & Detected Patterns:**
 ${insightsSummary}
 
+IMPORTANT: The user develops exclusively with Claude Code. All coding is done by Claude Code based on user direction. Cost inefficiencies should be addressed through better Claude Code instructions.
+
 Generate a briefing that:
 1. Focuses on ONE specific cost optimization opportunity
 2. Estimates potential savings (minor/moderate/significant impact)
 3. Provides a "before/after" code example with implementation guidance
-4. Notes any trade-offs to consider
+4. Provides a CLAUDE.md rule to ensure cost-efficient patterns in future code
 
-Focus on quick wins - changes that take <1 hour but reduce costs.
+Format the output with:
+- Brief explanation of the cost issue
+- Before/after code example
+- An "Add to CLAUDE.md" section with exact text to copy-paste
+
+The CLAUDE.md section MUST be formatted exactly like this for easy copy-paste:
+
+**Add to CLAUDE.md:**
+\`\`\`
+- when reading multiple Firestore documents, use batch reads (getAll) instead of individual reads
+- prefer Cloud Run scale-to-zero configurations over always-on instances for non-latency-critical services
+\`\`\`
+
+Rules should match existing CLAUDE.md style:
+- Start with lowercase (unless proper noun)
+- Imperative form ("use X" not "you should use X")
+- Concise, single-line rules
+- No periods at end
+
+Focus on quick wins that Claude Code can implement.
 Be specific to their stack (GCP, Firestore, Cloud Run).
 
 Output only the briefing content in markdown format, no preamble.`;
@@ -764,8 +831,22 @@ export async function generateBriefing(config, signals, options = {}) {
     }
     const cardResults = await Promise.all(cardPromises);
     const cards = cardResults.filter((c) => c !== null);
-    // Sort by priority
-    cards.sort((a, b) => a.priority - b.priority);
+    // Sort by config order (enabled_cards key order), then by priority as fallback
+    const enabledCards = config.preferences?.enabled_cards || {};
+    const cardOrder = Object.keys(enabledCards);
+    cards.sort((a, b) => {
+        const aIndex = cardOrder.indexOf(a.type);
+        const bIndex = cardOrder.indexOf(b.type);
+        // If both in config, use config order
+        if (aIndex !== -1 && bIndex !== -1) {
+            return aIndex - bIndex;
+        }
+        // If only one in config, it comes first
+        if (aIndex !== -1) return -1;
+        if (bIndex !== -1) return 1;
+        // Neither in config, fall back to priority
+        return a.priority - b.priority;
+    });
     // Limit to max_cards
     const limitedCards = cards.slice(0, config.preferences.max_cards);
     const briefing = {

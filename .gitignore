@@ -1,5 +1,16 @@
 # Node.js
 node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.npm
+.eslintcache
+.node_repl_history
+
+# TypeScript
+*.tsbuildinfo
+
+# Claude Code
 .claude/
 
 # Memory files (personal project context - not for version control)

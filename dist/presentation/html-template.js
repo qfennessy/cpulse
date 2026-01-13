@@ -23,11 +23,24 @@ const ACCENT_COLOR = '#c4402f';
  */
 export function markdownToEmailHtml(markdown) {
     let html = markdown;
-    // Escape HTML first
+
+    // Handle fenced code blocks FIRST (before escaping)
+    // These get special treatment for clean copy/paste
+    const codeBlocks = [];
+    html = html.replace(/```(\w*)\n([\s\S]*?)```/g, (_match, lang, code) => {
+        const index = codeBlocks.length;
+        // Trim trailing newline but preserve internal formatting
+        const cleanCode = code.replace(/\n$/, '');
+        codeBlocks.push({ lang, code: cleanCode });
+        return `__CODEBLOCK_${index}__`;
+    });
+
+    // Escape HTML (but not the code block placeholders)
     html = html.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-    // Bold: **text** or __text__
+
+    // Bold: **text** or __text__ (but not our CODEBLOCK placeholders)
     html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
-    html = html.replace(/__(.+?)__/g, '<strong>$1</strong>');
+    html = html.replace(/__(?!CODEBLOCK_)(.+?)__/g, '<strong>$1</strong>');
     // Italic: *text* or _text_
     html = html.replace(/(?<!\*)\*([^*]+?)\*(?!\*)/g, '<em>$1</em>');
     html = html.replace(/(?<!_)_([^_]+?)_(?!_)/g, '<em>$1</em>');
@@ -43,13 +56,15 @@ export function markdownToEmailHtml(markdown) {
     html = html.replace(/^## (.+)$/gm, '<h2 style="margin:24px 0 12px;font-size:18px;font-weight:600;color:#1a1a1a;">$1</h2>');
     html = html.replace(/^# (.+)$/gm, '<h1 style="margin:28px 0 16px;font-size:22px;font-weight:700;color:#1a1a1a;">$1</h1>');
     // Convert list items with distinct markers (tight spacing for better readability)
-    html = html.replace(/^\d+\. (.+)$/gm, '<li data-ol style="margin:2px 0;color:#333;">$1</li>');
-    html = html.replace(/^- (.+)$/gm, '<li data-ul style="margin:2px 0;color:#333;">$1</li>');
-    // Wrap each list type separately
-    html = html.replace(/(<li data-ol[^>]*>.*<\/li>\n?)+/g, '<ol style="margin:12px 0;padding-left:24px;">$&</ol>');
-    html = html.replace(/(<li data-ul[^>]*>.*<\/li>\n?)+/g, '<ul style="margin:12px 0;padding-left:24px;">$&</ul>');
+    html = html.replace(/^\d+\. (.+)$/gm, '<li data-ol style="margin:0;padding:1px 0;color:#333;">$1</li>');
+    html = html.replace(/^- (.+)$/gm, '<li data-ul style="margin:0;padding:1px 0;color:#333;">$1</li>');
+    // Wrap each list type separately (tight margins, no extra spacing)
+    html = html.replace(/(<li data-ol[^>]*>.*<\/li>\n?)+/g, '<ol style="margin:8px 0;padding-left:24px;line-height:1.4;">$&</ol>');
+    html = html.replace(/(<li data-ul[^>]*>.*<\/li>\n?)+/g, '<ul style="margin:8px 0;padding-left:24px;line-height:1.4;">$&</ul>');
     // Clean up data attributes
     html = html.replace(/ data-ol| data-ul/g, '');
+    // Remove any newlines between list items (they cause extra <br> later)
+    html = html.replace(/<\/li>\n+<li/g, '</li><li');
     // Paragraphs (double newlines)
     html = html.replace(/\n\n/g, '</p><p style="margin:16px 0;line-height:1.7;color:#333;">');
     // Single newlines to <br>
@@ -59,6 +74,34 @@ export function markdownToEmailHtml(markdown) {
     // Clean up empty paragraphs
     html = html.replace(/<p[^>]*><\/p>/g, '');
     html = html.replace(/<p[^>]*><br><\/p>/g, '');
+
+    // Restore code blocks with styled rendering
+    // Box style: light background, left border accent, monospace font
+    // Uses <pre> to preserve whitespace for clean copy/paste
+    for (let i = 0; i < codeBlocks.length; i++) {
+        const { lang, code } = codeBlocks[i];
+        // Escape HTML in the code content
+        const escapedCode = code
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;');
+        // Keep actual newlines for clean copy/paste (pre tag preserves them)
+        // Language label if provided
+        const langLabel = lang ? `<div style="font-size:11px;color:#666;margin-bottom:8px;text-transform:uppercase;letter-spacing:0.5px;">${lang}</div>` : '';
+        // Styled code block - distinct box with left border accent
+        const codeBlockHtml = `</p>
+<div style="margin:16px 0;padding:16px;background:#f8f9fa;border-left:4px solid ${ACCENT_COLOR};border-radius:4px;overflow-x:auto;">
+${langLabel}<pre style="margin:0;font-family:'SF Mono',Monaco,'Cascadia Code',Consolas,monospace;font-size:13px;line-height:1.5;color:#1a1a1a;white-space:pre-wrap;word-wrap:break-word;">${escapedCode}</pre>
+</div>
+<p style="margin:16px 0;line-height:1.7;color:#333;">`;
+        html = html.replace(`__CODEBLOCK_${i}__`, codeBlockHtml);
+    }
+
+    // Clean up any artifacts from code block insertion
+    html = html.replace(/<p[^>]*>\s*<\/p>/g, '');
+    html = html.replace(/<br>\s*<\/p>\s*<div/g, '</p><div');
+    html = html.replace(/<\/div>\s*<p[^>]*>\s*<br>/g, '</div><p style="margin:16px 0;line-height:1.7;color:#333;">');
+
     return html;
 }
 /**

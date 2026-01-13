@@ -3,7 +3,7 @@
 **Created:** 2026-01-12
 **Last Updated:** 2026-01-13
 
-**Status:** Phase 7 implementation complete
+**Status:** Phase 8 implementation complete
 
 ---
 
@@ -610,6 +610,46 @@ Memory Files + Session Activity + GitHub Activity
   - `--force` flag to overwrite existing installation
   - `--link` flag to create symlink in `/usr/local/bin` (requires sudo)
   - Provides shell configuration instructions for PATH setup
+
+### Phase 8: Claude Code-Aware Advisory
+
+**Key insight:** The user develops exclusively with Claude Code - all coding is done by Claude Code based on user direction. Advisory cards should acknowledge this workflow and provide advice in a format useful for Claude Code.
+
+**Changes:**
+
+- **System prompt update** - Added context explaining that Claude Code does all coding
+- **Advisory cards now include CLAUDE.md rules** - Each advisory card includes a section with instructions the user can add to their CLAUDE.md to teach Claude Code the recommended pattern
+- **Tech Advisory** - Provides stack-specific tips with CLAUDE.md rules for enforcing patterns
+- **Challenge Insights** - Identifies patterns Claude Code is making and provides rules to prevent recurrence
+- **Cost Optimization** - Suggests cost-efficient patterns with CLAUDE.md rules for enforcement
+- **Card ordering by config** - Cards now appear in the order specified in `enabled_cards` in config.yaml
+
+**Output Format:**
+Advisory cards now include an "Add to CLAUDE.md" section with copy-paste instructions:
+```
+**Add to CLAUDE.md:**
+- when reading multiple Firestore documents, use batch reads (getAll) instead of individual reads
+```
+
+Rules follow the existing CLAUDE.md style (lowercase, imperative, no periods).
+
+**Card Order Configuration:**
+The order of cards in `enabled_cards` controls the output order:
+```yaml
+preferences:
+  enabled_cards:
+    post_merge_feedback: true   # appears first
+    code_review: true           # appears second
+    project_continuity: true    # appears third
+    challenge_insights: true
+    tech_advisory: true
+    open_questions: true
+    patterns: true
+    cost_optimization: true
+```
+
+**Rationale:**
+Since Claude Code follows CLAUDE.md instructions, the most effective way to change coding practices is to update those instructions. This phase shifts advisory cards from "you should do X" to "tell Claude Code to do X" with ready-to-use rules.
 
 ---
 

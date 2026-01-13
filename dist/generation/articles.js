@@ -493,7 +493,9 @@ export async function generateBriefing(config, signals, options = {}) {
     const client = new Anthropic({ apiKey });
     const dataDir = config.data_dir || `${process.env.HOME}/.cpulse`;
     // Load memory context from active project paths
-    const projectPaths = signals.claudeCode.recentSessions.map((s) => s.projectPath);
+    const projectPaths = signals.claudeCode.recentSessions
+        .map((s) => s.projectPath || s.project)
+        .filter(Boolean);
     const memoryContext = loadMemoryContext(projectPaths);
     // Determine primary project for memory lookup
     const primaryProject = signals.claudeCode.activeProjects[0] || undefined;

@@ -46,7 +46,7 @@ function parseHours(value: string): number {
 program
   .name('cpulse')
   .description('Commit Pulse - Personal daily briefings from Claude Code sessions and GitHub activity')
-  .version('0.1.0');
+  .version('0.9.0');
 
 program
   .command('init')

@@ -636,7 +636,9 @@ export async function generateBriefing(
   const dataDir = config.data_dir || `${process.env.HOME}/.cpulse`;
 
   // Load memory context from active project paths
-  const projectPaths = signals.claudeCode.recentSessions.map((s) => s.projectPath);
+  const projectPaths = signals.claudeCode.recentSessions
+    .map((s) => s.projectPath || s.project)
+    .filter(Boolean) as string[];
   const memoryContext = loadMemoryContext(projectPaths);
 
   // Determine primary project for memory lookup

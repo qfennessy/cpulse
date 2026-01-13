@@ -641,12 +641,25 @@ program
             console.log(`Run manually: cd ${installDir} && npm install --omit=dev`);
         }
 
+        // Install man page
+        const manDir = path.join(homeDir, '.cpulse', 'man', 'man1');
+        const manPageSrc = path.join(srcDir, 'cpulse.1');
+        const manPageDest = path.join(manDir, 'cpulse.1');
+
+        if (fs.existsSync(manPageSrc)) {
+            fs.mkdirSync(manDir, { recursive: true });
+            fs.copyFileSync(manPageSrc, manPageDest);
+            console.log('✓ Man page installed');
+        }
+
         console.log('\n✓ Installation complete!');
         console.log(`\nInstalled to: ${installDir}`);
 
-        console.log('\nTo use cpulse globally, add to your shell config:');
-        console.log(`\n  # Add to ~/.bashrc, ~/.zshrc, or similar:`);
+        console.log('\nTo use cpulse globally, add to your shell config (~/.zshrc or ~/.bashrc):');
+        console.log(`\n  # Alias for cpulse command`);
         console.log(`  alias cpulse='node ${cliPath}'`);
+        console.log(`\n  # Man page access`);
+        console.log(`  export MANPATH="${path.join(homeDir, '.cpulse', 'man')}:$MANPATH"`);
 
         if (options.link) {
             const linkPath = '/usr/local/bin/cpulse';

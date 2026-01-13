@@ -33,11 +33,17 @@ npm install
 node dist/cli.js install
 ```
 
-After installation, add the alias to your shell config (~/.zshrc or ~/.bashrc):
+After installation, add to your shell config (~/.zshrc or ~/.bashrc):
 
 ```bash
+# Alias for cpulse command
 alias cpulse='node ~/.cpulse/bin/cli.js'
+
+# Man page access
+export MANPATH="$HOME/.cpulse/man:$MANPATH"
 ```
+
+Then you can use `man cpulse` for documentation.
 
 ### Option 2: Run from Source
 

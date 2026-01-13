@@ -202,8 +202,16 @@ generate a "Code Review Digest" that:
 # ~/.cpulse/config.yaml
 email:
   to: quentin@example.com
+  from: quentin@example.com
   send_time: "06:00"
   timezone: "America/Los_Angeles"
+  smtp:
+    host: smtp.gmail.com
+    port: 587
+    secure: false  # true for 465, false for other ports
+    auth:
+      user: quentin@example.com
+      pass: app-password-here  # Use app password, not account password
 
 sources:
   claude_code:
@@ -263,7 +271,7 @@ Next steps:
 | Scheduler | node-cron or system cron | Simple, reliable |
 | Claude API | @anthropic-ai/sdk | Article generation |
 | GitHub API | Octokit | Commit/PR data |
-| Email | Resend or SendGrid | Reliable delivery, good DX |
+| Email | SMTP (nodemailer) | Uses existing email account, no third-party signup |
 | Storage | SQLite or JSON files | Simple, local-first |
 | Config | YAML | Human-readable |
 
@@ -287,6 +295,7 @@ Next steps:
 | Briefing frequency | Daily batch only | Keeps complexity low; morning email is the primary use case |
 | Multi-machine support | Single machine | Simplifies initial implementation; can revisit if needed |
 | Briefing retention | Indefinite | Historical briefings provide value for pattern analysis and reference |
+| Email delivery | SMTP via nodemailer | Uses existing email account; no third-party service signup required |
 
 ---
 

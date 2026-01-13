@@ -1,7 +1,12 @@
 import nodemailer from 'nodemailer';
 import type { Transporter } from 'nodemailer';
 import { marked } from 'marked';
-import type { Briefing, EmailConfig } from '../types/index.js';
+import type { Briefing, EmailConfig, ExtractedSignals } from '../types/index.js';
+import {
+  wrapWithNarratives,
+  renderBriefingHtml,
+  renderBriefingPlainText,
+} from '../presentation/index.js';
 
 function formatBriefingAsMarkdown(briefing: Briefing): string {
   const lines: string[] = [];
@@ -173,7 +178,8 @@ export async function createTransporter(config: EmailConfig): Promise<Transporte
 
 export async function sendBriefingEmail(
   config: EmailConfig,
-  briefing: Briefing
+  briefing: Briefing,
+  signals?: ExtractedSignals
 ): Promise<void> {
   const transporter = await createTransporter(config);
 
@@ -184,8 +190,20 @@ export async function sendBriefingEmail(
   });
 
   const subject = `cpulse: Your Daily Briefing for ${dateStr}`;
-  const text = formatBriefingAsMarkdown(briefing);
-  const html = await formatBriefingAsHtml(briefing);
+
+  let text: string;
+  let html: string;
+
+  if (signals) {
+    // Use enhanced presentation with narratives
+    const { opening, cardTransitions, closing } = wrapWithNarratives(briefing.cards, signals);
+    html = renderBriefingHtml(briefing.id, briefing.cards, opening, closing, cardTransitions);
+    text = renderBriefingPlainText(briefing.cards, opening, closing, cardTransitions);
+  } else {
+    // Fall back to simple formatting
+    text = formatBriefingAsMarkdown(briefing);
+    html = await formatBriefingAsHtml(briefing);
+  }
 
   await transporter.sendMail({
     from: config.from,
@@ -194,6 +212,18 @@ export async function sendBriefingEmail(
     text,
     html,
   });
+}
+
+/**
+ * Format briefing with enhanced narratives.
+ * Used for preview command.
+ */
+export function formatBriefingWithNarratives(
+  briefing: Briefing,
+  signals: ExtractedSignals
+): string {
+  const { opening, cardTransitions, closing } = wrapWithNarratives(briefing.cards, signals);
+  return renderBriefingPlainText(briefing.cards, opening, closing, cardTransitions);
 }
 
 export { formatBriefingAsMarkdown, formatBriefingAsHtml };

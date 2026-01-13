@@ -1,4 +1,5 @@
 import type { ClaudeCodeSession, GitHubCommit } from '../types/index.js';
+import { getParentProject } from '../sources/worktree.js';
 
 export interface FilePattern {
   path: string;
@@ -14,6 +15,7 @@ export interface ProjectPattern {
   totalTime: number; // minutes
   lastActive: Date;
   filesModified: string[];
+  worktrees?: string[]; // List of worktrees if this is a parent project
 }
 
 export interface TopicPattern {
@@ -86,15 +88,18 @@ export function analyzeFilePatterns(sessions: ClaudeCodeSession[]): FilePattern[
 }
 
 export function analyzeProjectPatterns(sessions: ClaudeCodeSession[]): ProjectPattern[] {
-  const projectMap = new Map<string, ProjectPattern>();
+  const projectMap = new Map<string, ProjectPattern & { worktreeSet: Set<string> }>();
 
   for (const session of sessions) {
-    const key = session.projectPath || session.project;
-    const existing = projectMap.get(key);
+    // Group by parent project (handles worktrees)
+    const parentProject = getParentProject(session.projectPath, session.project);
+    const key = parentProject;
 
     const sessionDuration = session.endTime
       ? (session.endTime.getTime() - session.startTime.getTime()) / 60000
       : 0;
+
+    const existing = projectMap.get(key);
 
     if (existing) {
       existing.sessionCount++;
@@ -107,20 +112,27 @@ export function analyzeProjectPatterns(sessions: ClaudeCodeSession[]): ProjectPa
           existing.filesModified.push(file);
         }
       }
+      // Track worktrees
+      existing.worktreeSet.add(session.project);
     } else {
       projectMap.set(key, {
-        name: session.project,
+        name: parentProject,
         path: session.projectPath,
         sessionCount: 1,
         totalTime: sessionDuration,
         lastActive: session.endTime || session.startTime,
         filesModified: [...session.filesModified],
+        worktreeSet: new Set([session.project]),
       });
     }
   }
 
-  // Sort by session count, return top 10
+  // Convert to ProjectPattern array and sort by session count
   return Array.from(projectMap.values())
+    .map(({ worktreeSet, ...pattern }) => ({
+      ...pattern,
+      worktrees: worktreeSet.size > 1 ? Array.from(worktreeSet) : undefined,
+    }))
     .sort((a, b) => b.sessionCount - a.sessionCount)
     .slice(0, 10);
 }
@@ -232,7 +244,10 @@ export function formatPatternSummary(analysis: PatternAnalysis): string {
     for (const proj of analysis.activeProjects.slice(0, 5)) {
       const hours = Math.round(proj.totalTime / 60);
       const timeStr = isNaN(hours) || hours <= 0 ? '' : `, ~${hours}h total`;
-      lines.push(`- ${proj.name}: ${proj.sessionCount} sessions${timeStr}`);
+      const worktreeInfo = proj.worktrees && proj.worktrees.length > 1
+        ? ` (${proj.worktrees.length} worktrees)`
+        : '';
+      lines.push(`- ${proj.name}: ${proj.sessionCount} sessions${timeStr}${worktreeInfo}`);
     }
     lines.push('');
   }

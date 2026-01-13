@@ -14,7 +14,9 @@
     "build": "tsc",
     "start": "node dist/cli.js",
     "dev": "tsx src/cli.ts",
+    "cpulse": "tsx src/cli.ts",
     "generate": "tsx src/cli.ts generate",
+    "preview": "tsx src/cli.ts preview",
     "test": "vitest"
   },
   "keywords": [

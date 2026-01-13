@@ -10,23 +10,38 @@ This was inspired by ChatGPT Pulse. As of 13 Jan 2026, Pulse is only available t
 
 ## Example Briefing
 
-<p align="center">
-  <img src="docs/images/briefing-header.png" alt="Briefing Header" width="600">
-</p>
+<table>
+<tr>
+<td width="60%">
+<img src="docs/images/briefing-header.png" alt="Briefing Header">
+</td>
+<td width="40%" valign="top">
 
-Daily briefings include **Project Continuity** cards summarizing your Claude Code sessions, files modified, and immediate blockers.
+**Project Continuity** cards summarize your Claude Code sessions, files modified, and immediate blockers detected from your conversations.
 
-<p align="center">
-  <img src="docs/images/briefing-code-review.png" alt="Code Review Card" width="600">
-</p>
+</td>
+</tr>
+<tr>
+<td width="60%">
+<img src="docs/images/briefing-code-review.png" alt="Code Review Card">
+</td>
+<td width="40%" valign="top">
 
-**Code Review** cards show your active PR queue, grouped by priority and comment count.
+**Code Review** cards show your active PR queue grouped by priority and comment count, with direct links to GitHub.
 
-<p align="center">
-  <img src="docs/images/briefing-patterns.png" alt="Patterns Card" width="600">
-</p>
+</td>
+</tr>
+<tr>
+<td width="60%">
+<img src="docs/images/briefing-patterns.png" alt="Patterns Card">
+</td>
+<td width="40%" valign="top">
 
-**Patterns** cards analyze your development habits and provide actionable recommendations.
+**Patterns** cards analyze your development habits and provide actionable recommendations based on file churn and session activity.
+
+</td>
+</tr>
+</table>
 
 ## Features
 

@@ -383,10 +383,23 @@ Next steps:
 
 ### Phase 4: Advanced Features
 
-- Web interface for configuration and history
-- Briefing search and analytics
-- Mobile-friendly web view for briefings
+**Post-Merge PR Comments:**
+- Detect comments added to PRs after they are merged
+- Highlight these in briefings as "post-merge feedback" requiring attention
+- Particularly useful for cocos-story where reviews may come after merge
+- Link directly to the comment thread
+- Track which post-merge comments have been acknowledged
+
+**Web Interface:**
+- Configuration editor with live preview
+- Briefing history browser with search
+- Mobile-friendly responsive design
 - Calendar integration for scheduling follow-ups
+
+**Analytics:**
+- Briefing engagement metrics
+- Topic trend analysis over time
+- Feedback pattern visualization
 
 ---
 

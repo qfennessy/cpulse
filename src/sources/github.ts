@@ -7,6 +7,107 @@ import type {
   PostMergeComment,
 } from '../types/index.js';
 
+/**
+ * Calculate PR age and urgency level.
+ * Urgency is based on how long the PR has been open and comment activity.
+ */
+function calculatePRUrgency(pr: GitHubPR): void {
+  const now = new Date();
+  pr.ageInDays = Math.floor(
+    (now.getTime() - pr.createdAt.getTime()) / (1000 * 60 * 60 * 24)
+  );
+
+  // Calculate urgency based on age and activity
+  if (pr.ageInDays > 14 || pr.reviewComments > 5) {
+    pr.urgency = 'critical';
+  } else if (pr.ageInDays > 7 || pr.reviewComments > 2) {
+    pr.urgency = 'high';
+  } else if (pr.ageInDays > 3) {
+    pr.urgency = 'medium';
+  } else {
+    pr.urgency = 'low';
+  }
+
+  // If this is a review request, calculate how long review has been pending
+  if (pr.isReviewRequested) {
+    // Use updatedAt as proxy for when review was requested
+    // (more accurate would require additional API calls)
+    pr.reviewAgeInDays = Math.floor(
+      (now.getTime() - pr.updatedAt.getTime()) / (1000 * 60 * 60 * 24)
+    );
+  }
+}
+
+/**
+ * Classify post-merge comment severity based on content analysis.
+ */
+function classifyCommentSeverity(body: string): {
+  severity: 'critical' | 'suggestion' | 'question' | 'info';
+  severityReason: string;
+  requiresFollowUp: boolean;
+  suggestedAction?: string;
+} {
+  const bodyLower = body.toLowerCase();
+
+  // Critical: Security, bugs, breaking changes
+  const criticalPatterns: Array<{ pattern: RegExp; label: string }> = [
+    { pattern: /security|vulnerability|exploit|injection|xss|csrf/i, label: 'security' },
+    { pattern: /\bbug\b|broken|crash|fail(?:s|ed|ing)?|exception/i, label: 'bug' },
+    { pattern: /breaking change|regression|reverted/i, label: 'breaking change' },
+    { pattern: /urgent|asap|critical|blocker/i, label: 'urgent' },
+  ];
+
+  for (const { pattern, label } of criticalPatterns) {
+    if (pattern.test(body)) {
+      return {
+        severity: 'critical',
+        severityReason: `Contains ${label} indicator`,
+        requiresFollowUp: true,
+        suggestedAction: 'Create hotfix or issue immediately',
+      };
+    }
+  }
+
+  // Question: Needs response
+  if (body.includes('?') && body.length < 500) {
+    const startsWithQuestion = /^(why|how|what|when|where|could|should|would|can|is|are|do|does)/im.test(body);
+    if (startsWithQuestion || body.split('?').length > 1) {
+      return {
+        severity: 'question',
+        severityReason: 'Contains question requiring response',
+        requiresFollowUp: true,
+        suggestedAction: 'Reply to comment',
+      };
+    }
+  }
+
+  // Suggestion: Improvement ideas
+  const suggestionPatterns = [
+    /suggest|consider|might want|could also|alternative/i,
+    /nit:?|minor:?|style:?|formatting/i,
+    /future|later|follow-up|next time/i,
+    /\bimo\b|\bfyi\b|for your information/i,
+  ];
+
+  for (const pattern of suggestionPatterns) {
+    if (pattern.test(body)) {
+      return {
+        severity: 'suggestion',
+        severityReason: 'Contains improvement suggestion',
+        requiresFollowUp: false,
+        suggestedAction: 'Add to backlog for consideration',
+      };
+    }
+  }
+
+  // Default: Info
+  return {
+    severity: 'info',
+    severityReason: 'General feedback',
+    requiresFollowUp: false,
+  };
+}
+
 export async function createGitHubClient(
   config: GitHubSourceConfig
 ): Promise<Octokit> {
@@ -123,7 +224,7 @@ export async function getOpenPullRequests(
 
     for (const pr of reviewRequests.items) {
       const repoFullName = pr.repository_url.split('/').slice(-2).join('/');
-      pullRequests.push({
+      const ghPR: GitHubPR = {
         number: pr.number,
         title: pr.title,
         state: 'open',
@@ -132,7 +233,10 @@ export async function getOpenPullRequests(
         updatedAt: new Date(pr.updated_at),
         reviewComments: pr.comments,
         isDraft: pr.draft || false,
-      });
+        isReviewRequested: true,
+      };
+      calculatePRUrgency(ghPR);
+      pullRequests.push(ghPR);
     }
   } catch {
     // Search might fail without proper permissions
@@ -150,7 +254,7 @@ export async function getOpenPullRequests(
 
       // Skip if already added (check both PR number AND repo to avoid false matches)
       if (pullRequests.some((p) => p.number === pr.number && p.repo === repoFullName)) continue;
-      pullRequests.push({
+      const ghPR: GitHubPR = {
         number: pr.number,
         title: pr.title,
         state: 'open',
@@ -159,7 +263,10 @@ export async function getOpenPullRequests(
         updatedAt: new Date(pr.updated_at),
         reviewComments: pr.comments,
         isDraft: pr.draft || false,
-      });
+        isReviewRequested: false,
+      };
+      calculatePRUrgency(ghPR);
+      pullRequests.push(ghPR);
     }
   } catch {
     // Search might fail
@@ -291,6 +398,7 @@ export async function getPostMergeComments(
             const commentDate = new Date(comment.created_at);
             // Only include comments created AFTER the PR was merged
             if (commentDate > mergedAt) {
+              const severity = classifyCommentSeverity(comment.body || '');
               postMergeComments.push({
                 id: comment.id,
                 prNumber: pr.number,
@@ -304,6 +412,7 @@ export async function getPostMergeComments(
                 isReviewComment: true,
                 path: comment.path,
                 line: comment.line || comment.original_line,
+                ...severity,
               });
             }
           }
@@ -324,6 +433,7 @@ export async function getPostMergeComments(
             const commentDate = new Date(comment.created_at);
             // Only include comments created AFTER the PR was merged
             if (commentDate > mergedAt) {
+              const severity = classifyCommentSeverity(comment.body || '');
               postMergeComments.push({
                 id: comment.id,
                 prNumber: pr.number,
@@ -335,6 +445,7 @@ export async function getPostMergeComments(
                 mergedAt,
                 url: comment.html_url,
                 isReviewComment: false,
+                ...severity,
               });
             }
           }

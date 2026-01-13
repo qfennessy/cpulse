@@ -37,3 +37,10 @@ export {
   renderBriefingHtml,
   renderBriefingPlainText,
 } from './html-template.js';
+
+export {
+  markdownToAnsi,
+  renderCardTerminal,
+  renderBriefingTerminal,
+  formatMarkdownForTerminal,
+} from './terminal.js';

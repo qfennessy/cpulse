@@ -1,35 +1,89 @@
 import { Octokit } from 'octokit';
-
-// Cache for repo list to avoid repeated API calls
-let cachedRepos = null;
-let cacheTimestamp = 0;
-const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
-
 /**
- * Check if an error is a GitHub rate limit error.
+ * Calculate PR age and urgency level.
+ * Urgency is based on how long the PR has been open and comment activity.
  */
-function isRateLimitError(error) {
-    const message = error?.message || error?.toString() || '';
-    return message.includes('rate limit') ||
-           message.includes('quota exhausted') ||
-           message.includes('API rate limit') ||
-           error?.status === 403 ||
-           error?.status === 429;
-}
-
-/**
- * Log rate limit warning (only once per session).
- */
-let rateLimitWarned = false;
-function warnRateLimit(context) {
-    if (!rateLimitWarned) {
-        console.warn(`⚠️  GitHub API rate limit reached. Some data may be incomplete.`);
-        console.warn(`   Context: ${context}`);
-        console.warn(`   Try again later or specify repos in config to reduce API calls.`);
-        rateLimitWarned = true;
+function calculatePRUrgency(pr) {
+    const now = new Date();
+    pr.ageInDays = Math.floor((now.getTime() - pr.createdAt.getTime()) / (1000 * 60 * 60 * 24));
+    // Calculate urgency based on age and activity
+    if (pr.ageInDays > 14 || pr.reviewComments > 5) {
+        pr.urgency = 'critical';
+    }
+    else if (pr.ageInDays > 7 || pr.reviewComments > 2) {
+        pr.urgency = 'high';
+    }
+    else if (pr.ageInDays > 3) {
+        pr.urgency = 'medium';
+    }
+    else {
+        pr.urgency = 'low';
+    }
+    // If this is a review request, calculate how long review has been pending
+    if (pr.isReviewRequested) {
+        // Use updatedAt as proxy for when review was requested
+        // (more accurate would require additional API calls)
+        pr.reviewAgeInDays = Math.floor((now.getTime() - pr.updatedAt.getTime()) / (1000 * 60 * 60 * 24));
     }
 }
-
+/**
+ * Classify post-merge comment severity based on content analysis.
+ */
+function classifyCommentSeverity(body) {
+    const bodyLower = body.toLowerCase();
+    // Critical: Security, bugs, breaking changes
+    const criticalPatterns = [
+        { pattern: /security|vulnerability|exploit|injection|xss|csrf/i, label: 'security' },
+        { pattern: /\bbug\b|broken|crash|fail(?:s|ed|ing)?|exception/i, label: 'bug' },
+        { pattern: /breaking change|regression|reverted/i, label: 'breaking change' },
+        { pattern: /urgent|asap|critical|blocker/i, label: 'urgent' },
+    ];
+    for (const { pattern, label } of criticalPatterns) {
+        if (pattern.test(body)) {
+            return {
+                severity: 'critical',
+                severityReason: `Contains ${label} indicator`,
+                requiresFollowUp: true,
+                suggestedAction: 'Create hotfix or issue immediately',
+            };
+        }
+    }
+    // Question: Needs response
+    if (body.includes('?') && body.length < 500) {
+        const startsWithQuestion = /^(why|how|what|when|where|could|should|would|can|is|are|do|does)/im.test(body);
+        if (startsWithQuestion || body.split('?').length > 1) {
+            return {
+                severity: 'question',
+                severityReason: 'Contains question requiring response',
+                requiresFollowUp: true,
+                suggestedAction: 'Reply to comment',
+            };
+        }
+    }
+    // Suggestion: Improvement ideas
+    const suggestionPatterns = [
+        /suggest|consider|might want|could also|alternative/i,
+        /nit:?|minor:?|style:?|formatting/i,
+        /future|later|follow-up|next time/i,
+        /\bimo\b|\bfyi\b|for your information/i,
+    ];
+    for (const pattern of suggestionPatterns) {
+        if (pattern.test(body)) {
+            return {
+                severity: 'suggestion',
+                severityReason: 'Contains improvement suggestion',
+                requiresFollowUp: false,
+                suggestedAction: 'Add to backlog for consideration',
+            };
+        }
+    }
+    // Default: Info
+    return {
+        severity: 'info',
+        severityReason: 'General feedback',
+        requiresFollowUp: false,
+    };
+}
 export async function createGitHubClient(config) {
     const token = config.token || process.env.GITHUB_PERSONAL_ACCESS_TOKEN || process.env.GITHUB_TOKEN;
     if (!token) {
@@ -37,47 +91,19 @@ export async function createGitHubClient(config) {
     }
     return new Octokit({ auth: token });
 }
-
-/**
- * Get repos from config or fetch from API (with caching).
- */
-async function getRepoList(octokit, config) {
-    // Use configured repos if available
-    if (config.repos && config.repos.length > 0) {
-        return config.repos;
-    }
-
-    // Check cache
-    if (cachedRepos && (Date.now() - cacheTimestamp) < CACHE_TTL) {
-        return cachedRepos;
-    }
-
-    // Fetch from API
-    try {
+export async function getRecentCommits(octokit, config, hoursBack = 168) {
+    const since = new Date(Date.now() - hoursBack * 60 * 60 * 1000).toISOString();
+    const commits = [];
+    // Get repos to check
+    let repos = config.repos;
+    if (!repos || repos.length === 0) {
+        // Fetch all repos the user has access to
         const { data: userRepos } = await octokit.rest.repos.listForAuthenticatedUser({
             sort: 'pushed',
             per_page: 50,
             visibility: config.include_private ? 'all' : 'public',
         });
-        cachedRepos = userRepos.map((r) => r.full_name);
-        cacheTimestamp = Date.now();
-        return cachedRepos;
-    } catch (error) {
-        if (isRateLimitError(error)) {
-            warnRateLimit('fetching repo list');
-            // Return cached repos if available, otherwise empty
-            return cachedRepos || [];
-        }
-        throw error;
-    }
-}
-export async function getRecentCommits(octokit, config, hoursBack = 168) {
-    const since = new Date(Date.now() - hoursBack * 60 * 60 * 1000).toISOString();
-    const commits = [];
-    // Get repos to check (uses cached list)
-    const repos = await getRepoList(octokit, config);
-    if (repos.length === 0) {
-        return commits;
+        repos = userRepos.map((r) => r.full_name);
     }
     for (const repoFullName of repos) {
         const [owner, repo] = repoFullName.split('/');
@@ -130,8 +156,16 @@ export async function getRecentCommits(octokit, config, hoursBack = 168) {
 }
 export async function getOpenPullRequests(octokit, config) {
     const pullRequests = [];
-    // Get repos to check (uses cached list)
-    const repos = await getRepoList(octokit, config);
+    // Get repos to check
+    let repos = config.repos;
+    if (!repos || repos.length === 0) {
+        const { data: userRepos } = await octokit.rest.repos.listForAuthenticatedUser({
+            sort: 'pushed',
+            per_page: 50,
+            visibility: config.include_private ? 'all' : 'public',
+        });
+        repos = userRepos.map((r) => r.full_name);
+    }
     // Also get PRs where user is requested reviewer
     // Using octokit.request directly to avoid deprecation warning on the wrapper method
     try {
@@ -141,7 +175,7 @@ export async function getOpenPullRequests(octokit, config) {
         });
         for (const pr of reviewRequests.items) {
             const repoFullName = pr.repository_url.split('/').slice(-2).join('/');
-            pullRequests.push({
+            const ghPR = {
                 number: pr.number,
                 title: pr.title,
                 state: 'open',
@@ -150,7 +184,10 @@ export async function getOpenPullRequests(octokit, config) {
                 updatedAt: new Date(pr.updated_at),
                 reviewComments: pr.comments,
                 isDraft: pr.draft || false,
-            });
+                isReviewRequested: true,
+            };
+            calculatePRUrgency(ghPR);
+            pullRequests.push(ghPR);
         }
     }
     catch {
@@ -167,7 +204,7 @@ export async function getOpenPullRequests(octokit, config) {
             // Skip if already added (check both PR number AND repo to avoid false matches)
             if (pullRequests.some((p) => p.number === pr.number && p.repo === repoFullName))
                 continue;
-            pullRequests.push({
+            const ghPR = {
                 number: pr.number,
                 title: pr.title,
                 state: 'open',
@@ -176,7 +213,10 @@ export async function getOpenPullRequests(octokit, config) {
                 updatedAt: new Date(pr.updated_at),
                 reviewComments: pr.comments,
                 isDraft: pr.draft || false,
-            });
+                isReviewRequested: false,
+            };
+            calculatePRUrgency(ghPR);
+            pullRequests.push(ghPR);
         }
     }
     catch {
@@ -187,10 +227,14 @@ export async function getOpenPullRequests(octokit, config) {
 export async function getStaleBranches(octokit, config, daysStale = 14) {
     const staleBranches = [];
     const staleDate = new Date(Date.now() - daysStale * 24 * 60 * 60 * 1000);
-    // Get repos to check (uses cached list)
-    const repos = await getRepoList(octokit, config);
-    if (repos.length === 0) {
-        return staleBranches;
+    let repos = config.repos;
+    if (!repos || repos.length === 0) {
+        const { data: userRepos } = await octokit.rest.repos.listForAuthenticatedUser({
+            sort: 'pushed',
+            per_page: 20,
+            visibility: config.include_private ? 'all' : 'public',
+        });
+        repos = userRepos.map((r) => r.full_name);
     }
     for (const repoFullName of repos.slice(0, 10)) {
         const [owner, repo] = repoFullName.split('/');
@@ -238,10 +282,14 @@ export async function getStaleBranches(octokit, config, daysStale = 14) {
 export async function getPostMergeComments(octokit, config, daysBack = 14) {
     const postMergeComments = [];
     const since = new Date(Date.now() - daysBack * 24 * 60 * 60 * 1000);
-    // Get repos to check (uses cached list)
-    const repos = await getRepoList(octokit, config);
-    if (repos.length === 0) {
-        return postMergeComments;
+    let repos = config.repos;
+    if (!repos || repos.length === 0) {
+        const { data: userRepos } = await octokit.rest.repos.listForAuthenticatedUser({
+            sort: 'pushed',
+            per_page: 20,
+            visibility: config.include_private ? 'all' : 'public',
+        });
+        repos = userRepos.map((r) => r.full_name);
     }
     for (const repoFullName of repos.slice(0, 10)) {
         const [owner, repo] = repoFullName.split('/');
@@ -276,6 +324,7 @@ export async function getPostMergeComments(octokit, config, daysBack = 14) {
                         const commentDate = new Date(comment.created_at);
                         // Only include comments created AFTER the PR was merged
                         if (commentDate > mergedAt) {
+                            const severity = classifyCommentSeverity(comment.body || '');
                             postMergeComments.push({
                                 id: comment.id,
                                 prNumber: pr.number,
@@ -289,6 +338,7 @@ export async function getPostMergeComments(octokit, config, daysBack = 14) {
                                 isReviewComment: true,
                                 path: comment.path,
                                 line: comment.line || comment.original_line,
+                                ...severity,
                             });
                         }
                     }
@@ -308,6 +358,7 @@ export async function getPostMergeComments(octokit, config, daysBack = 14) {
                         const commentDate = new Date(comment.created_at);
                         // Only include comments created AFTER the PR was merged
                         if (commentDate > mergedAt) {
+                            const severity = classifyCommentSeverity(comment.body || '');
                             postMergeComments.push({
                                 id: comment.id,
                                 prNumber: pr.number,
@@ -319,6 +370,7 @@ export async function getPostMergeComments(octokit, config, daysBack = 14) {
                                 mergedAt,
                                 url: comment.html_url,
                                 isReviewComment: false,
+                                ...severity,
                             });
                         }
                     }
@@ -340,36 +392,13 @@ export async function getGitHubActivity(config, hoursBack = 168) {
     if (!config.enabled) {
         return { commits: [], pullRequests: [], staleBranches: [], postMergeComments: [] };
     }
-
-    // Reset rate limit warning for new session
-    rateLimitWarned = false;
-
     const octokit = await createGitHubClient(config);
-
-    // Pre-fetch repo list once (will be cached for all subsequent calls)
-    await getRepoList(octokit, config);
-
-    // Run all fetches in parallel, catching rate limit errors individually
-    const results = await Promise.allSettled([
+    const [commits, pullRequests, staleBranches, postMergeComments] = await Promise.all([
         getRecentCommits(octokit, config, hoursBack),
         getOpenPullRequests(octokit, config),
         getStaleBranches(octokit, config),
         getPostMergeComments(octokit, config),
     ]);
-
-    // Extract results, using empty arrays for failed requests
-    const commits = results[0].status === 'fulfilled' ? results[0].value : [];
-    const pullRequests = results[1].status === 'fulfilled' ? results[1].value : [];
-    const staleBranches = results[2].status === 'fulfilled' ? results[2].value : [];
-    const postMergeComments = results[3].status === 'fulfilled' ? results[3].value : [];
-
-    // Log any non-rate-limit errors
-    for (const result of results) {
-        if (result.status === 'rejected' && !isRateLimitError(result.reason)) {
-            console.error('GitHub API error:', result.reason?.message || result.reason);
-        }
-    }
-
     return { commits, pullRequests, staleBranches, postMergeComments };
 }
 //# sourceMappingURL=github.js.map

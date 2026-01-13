@@ -40,13 +40,21 @@ export function buildNarrativeContext(signals: ExtractedSignals): NarrativeConte
       ? signals.claudeCode.activeProjects[0]
       : undefined;
 
+  // Count sessions for the primary project only
+  let sessionCount = signals.claudeCode.recentSessions.length;
+  if (primaryProject) {
+    sessionCount = signals.claudeCode.recentSessions.filter(
+      (s) => s.project === primaryProject || s.project.startsWith(primaryProject + '-')
+    ).length;
+  }
+
   return {
     timeOfDay,
     dayOfWeek,
     primaryProject,
     hasOpenPRs: signals.github.pullRequests.length > 0,
     hasUnfinishedWork: signals.claudeCode.openTodos.length > 0,
-    sessionCount: signals.claudeCode.recentSessions.length,
+    sessionCount,
     commitCount: signals.github.commits.length,
   };
 }

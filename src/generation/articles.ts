@@ -43,6 +43,8 @@ Your communication style:
 - No emojis, no excessive enthusiasm
 - Markdown formatting for code snippets and emphasis
 
+IMPORTANT: When the input contains markdown links like [text](url), you MUST preserve them exactly in your output. These links make the briefing actionable by letting the user click directly to PRs, commits, and files.
+
 Your goal is to help the developer pick up where they left off and stay oriented on their projects.`;
 
 function formatSessionSummary(session: ClaudeCodeSession): string {

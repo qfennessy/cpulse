@@ -111,7 +111,7 @@ export interface GitHubActivity {
 
 // Article types
 export interface ArticleCard {
-  type: 'project_continuity' | 'code_review' | 'learning' | 'open_questions' | 'suggestions';
+  type: 'project_continuity' | 'code_review' | 'learning' | 'open_questions' | 'suggestions' | 'patterns' | 'weekly_summary';
   title: string;
   content: string;
   priority: number;

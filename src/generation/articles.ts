@@ -8,6 +8,18 @@ import type {
   GitHubCommit,
   GitHubPR,
 } from '../types/index.js';
+import {
+  analyzePatterns,
+  formatPatternSummary,
+  extractAllQuestions,
+  formatQuestionsForBriefing,
+  shouldIncludeCardType,
+  type PatternAnalysis,
+  type OpenQuestion,
+} from '../intelligence/index.js';
+
+// Re-export intelligence types for external use
+export type { PatternAnalysis, OpenQuestion };
 
 const SYSTEM_PROMPT = `You are cpulse, a personal briefing assistant that generates concise, actionable insights from development activity.
 
@@ -223,6 +235,131 @@ Output only the briefing content in markdown format, no preamble.`;
   };
 }
 
+export async function generateOpenQuestionsCard(
+  client: Anthropic,
+  questions: OpenQuestion[],
+  config: Config
+): Promise<ArticleCard | null> {
+  if (questions.length === 0) return null;
+
+  const questionsText = formatQuestionsForBriefing(questions);
+
+  const prompt = `Based on these open questions from recent development sessions, generate an "Open Questions" briefing card.
+
+Open questions that weren't fully resolved:
+${questionsText}
+
+Generate a briefing that:
+1. Groups related questions together
+2. Prioritizes the most important unresolved questions
+3. Suggests which questions to tackle first
+4. Notes any questions that might be blockers
+
+Keep it concise. Focus on helping the developer remember and prioritize these open items.
+Output only the briefing content in markdown format, no preamble.`;
+
+  const response = await client.messages.create({
+    model: 'claude-sonnet-4-20250514',
+    max_tokens: 1024,
+    system: SYSTEM_PROMPT,
+    messages: [{ role: 'user', content: prompt }],
+  });
+
+  const content = response.content[0];
+  if (!content || content.type !== 'text') return null;
+
+  const lines = content.text.split('\n');
+  let title = 'Open Questions';
+  let body = content.text;
+
+  if (lines[0].startsWith('#')) {
+    title = lines[0].replace(/^#+\s*/, '');
+    body = lines.slice(1).join('\n').trim();
+  }
+
+  return {
+    type: 'open_questions',
+    title,
+    content: body,
+    priority: 3,
+    metadata: {
+      questionCount: questions.length,
+    },
+  };
+}
+
+export async function generatePatternsCard(
+  client: Anthropic,
+  patterns: PatternAnalysis,
+  config: Config
+): Promise<ArticleCard | null> {
+  // Only generate if we have meaningful patterns
+  if (
+    patterns.activeProjects.length === 0 &&
+    patterns.frequentFiles.length === 0 &&
+    patterns.recurringTopics.length === 0
+  ) {
+    return null;
+  }
+
+  const patternsSummary = formatPatternSummary(patterns);
+
+  // Find peak working hours
+  const peakHours = patterns.workingHours
+    .filter((h) => h.count > 0)
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 3)
+    .map((h) => `${h.hour}:00`);
+
+  const prompt = `Based on this analysis of recent development patterns, generate a "Weekly Patterns" briefing card.
+
+Pattern Analysis:
+${patternsSummary}
+
+Peak working hours: ${peakHours.join(', ')}
+
+Top tools used: ${patterns.toolUsage.slice(0, 5).map((t) => t.tool).join(', ')}
+
+Generate a briefing that:
+1. Highlights interesting patterns in work habits
+2. Notes which projects/files are getting the most attention
+3. Identifies any concerning patterns (e.g., lots of debugging, same files edited repeatedly)
+4. Provides one actionable insight based on the patterns
+
+Keep it brief and insightful. Focus on patterns that help the developer understand their work habits.
+Output only the briefing content in markdown format, no preamble.`;
+
+  const response = await client.messages.create({
+    model: 'claude-sonnet-4-20250514',
+    max_tokens: 1024,
+    system: SYSTEM_PROMPT,
+    messages: [{ role: 'user', content: prompt }],
+  });
+
+  const content = response.content[0];
+  if (!content || content.type !== 'text') return null;
+
+  const lines = content.text.split('\n');
+  let title = 'Weekly Patterns';
+  let body = content.text;
+
+  if (lines[0].startsWith('#')) {
+    title = lines[0].replace(/^#+\s*/, '');
+    body = lines.slice(1).join('\n').trim();
+  }
+
+  return {
+    type: 'patterns',
+    title,
+    content: body,
+    priority: 4,
+    metadata: {
+      projectCount: patterns.activeProjects.length,
+      topicCount: patterns.recurringTopics.length,
+    },
+  };
+}
+
 export async function generateBriefing(
   config: Config,
   signals: ExtractedSignals
@@ -235,18 +372,33 @@ export async function generateBriefing(
   }
 
   const client = new Anthropic({ apiKey });
+  const dataDir = config.data_dir || `${process.env.HOME}/.cpulse`;
+
+  // Analyze patterns and extract questions from sessions
+  const patterns = analyzePatterns(signals.claudeCode.recentSessions);
+  const questions = extractAllQuestions(signals.claudeCode.recentSessions);
 
   // Generate cards in parallel
   const cardPromises: Promise<ArticleCard | null>[] = [];
 
   // Project Continuity card (from Claude Code sessions)
-  if (config.sources.claude_code.enabled) {
+  if (config.sources.claude_code.enabled && shouldIncludeCardType(dataDir, 'project_continuity')) {
     cardPromises.push(generateProjectContinuityCard(client, signals, config));
   }
 
   // Code Review card (from GitHub activity)
-  if (config.sources.github.enabled) {
+  if (config.sources.github.enabled && shouldIncludeCardType(dataDir, 'code_review')) {
     cardPromises.push(generateCodeReviewCard(client, signals, config));
+  }
+
+  // Open Questions card (from session analysis)
+  if (config.sources.claude_code.enabled && shouldIncludeCardType(dataDir, 'open_questions')) {
+    cardPromises.push(generateOpenQuestionsCard(client, questions, config));
+  }
+
+  // Patterns card (from session analysis)
+  if (config.sources.claude_code.enabled && shouldIncludeCardType(dataDir, 'patterns')) {
+    cardPromises.push(generatePatternsCard(client, patterns, config));
   }
 
   const cardResults = await Promise.all(cardPromises);

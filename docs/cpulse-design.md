@@ -243,7 +243,7 @@ The email is rendered as clean HTML that degrades gracefully to plain text. Each
 - Code snippets where relevant (syntax highlighted)
 - Inline feedback buttons
 
-Example card:
+Example card (Phase 1-2, plain):
 
 ```
 ## Project Continuity: cpulse Authentication
@@ -259,6 +259,29 @@ Next steps:
 - The timeout suggests an unresolved promise—look for missing `await`
 
 [Helpful] [Not helpful] [Snooze this project]
+```
+
+Example card (Phase 3, with links and narrative):
+
+```
+Let's pick up where you left off with authentication...
+
+## Project Continuity: cpulse Authentication
+
+Yesterday you worked on JWT token validation in [src/auth/validate.ts:15](https://github.com/owner/cpulse/blob/main/src/auth/validate.ts#L15).
+The session ended with two failing tests in [auth.test.ts](https://github.com/owner/cpulse/blob/main/tests/auth.test.ts):
+
+- `should reject expired tokens` - [line 42](https://github.com/owner/cpulse/blob/main/tests/auth.test.ts#L42)
+- `should handle malformed tokens` - timeout after 5000ms
+
+Related: Your PR [#47](https://github.com/owner/cpulse/pull/47) is still open and has 2 new comments.
+
+Next steps:
+- Check if the token expiry logic handles edge cases around midnight UTC
+- The timeout suggests an unresolved promise—look for missing `await`
+- Address review comments on PR #47
+
+[👍 Helpful] [👎 Not helpful] [💤 Snooze]
 ```
 
 ---
@@ -315,12 +338,55 @@ Next steps:
 - Feedback loop integration
 - Curated topic priorities
 
-### Phase 3: Polish
+### Phase 3: Enhanced Presentation
 
-- Learning & Concepts cards with spaced repetition
-- Proactive suggestions
+**Worktree Recognition:**
+- Detect git worktrees and associate with parent project
+- Example: `cocos-story-gemini-live` → parent `cocos-story`
+- Detection methods:
+  - Parse `.git` file (worktrees have a file, not a directory, pointing to main repo)
+  - Check `git worktree list` output
+  - Fall back to naming convention heuristics (prefix matching)
+- Aggregate patterns across all worktrees of a project
+- Show worktree activity grouped under main project in briefings
+- Link to correct branch/worktree in GitHub URLs
+
+**Clickable Links & Deep Links:**
+- GitHub PR links: `repo#123` → `https://github.com/owner/repo/pull/123`
+- Commit links: `abc1234` → `https://github.com/owner/repo/commit/abc1234`
+- File links: `src/auth.ts:42` → GitHub blob view at specific line
+- Branch links: direct to compare view for stale branches
+- Session references: link to local session transcript if available
+
+**Narrative Transitions (inspired by ChatGPT Pulse):**
+- Contextual intro text connecting card groups thematically
+- Example: "After yesterday's auth work, here's what needs attention today..."
+- Smooth transitions between related cards
+- Summary closings with prioritized action items
+
+**Card Grouping & Theming:**
+- Group related cards by project or theme
+- Visual distinction between card types
+- Priority indicators (urgent, normal, FYI)
+
+**HTML Email Template:**
+- Clean, responsive design for email clients
+- Syntax-highlighted code blocks
+- Collapsible sections for detailed content
+- Inline feedback buttons (thumbs up/down)
+- Dark mode support
+
+**New Card Types:**
+- Learning & Concepts with spaced repetition
+- Proactive suggestions based on patterns
+- Weekly summary roll-up
+
+### Phase 4: Advanced Features
+
 - Web interface for configuration and history
 - Briefing search and analytics
+- Mobile-friendly web view for briefings
+- Calendar integration for scheduling follow-ups
 
 ---
 

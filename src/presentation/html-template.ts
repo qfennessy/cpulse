@@ -60,14 +60,16 @@ export function markdownToEmailHtml(markdown: string): string {
   html = html.replace(/^## (.+)$/gm, '<h2 style="margin:24px 0 12px;font-size:18px;font-weight:600;color:#1a1a1a;">$1</h2>');
   html = html.replace(/^# (.+)$/gm, '<h1 style="margin:28px 0 16px;font-size:22px;font-weight:700;color:#1a1a1a;">$1</h1>');
 
-  // Numbered lists - convert first, use data attribute to distinguish from bullet lists
-  html = html.replace(/^\d+\. (.+)$/gm, '<li data-numbered style="margin:8px 0;color:#333;">$1</li>');
-  html = html.replace(/(<li data-numbered[^>]*>.*<\/li>\n?)+/g, '<ol style="margin:16px 0;padding-left:24px;">$&</ol>');
-  html = html.replace(/ data-numbered/g, '');
+  // Convert list items with distinct markers
+  html = html.replace(/^\d+\. (.+)$/gm, '<li data-ol style="margin:8px 0;color:#333;">$1</li>');
+  html = html.replace(/^- (.+)$/gm, '<li data-ul style="margin:8px 0;color:#333;">$1</li>');
 
-  // Bullet lists
-  html = html.replace(/^- (.+)$/gm, '<li style="margin:8px 0;color:#333;">$1</li>');
-  html = html.replace(/(<li[^>]*>.*<\/li>\n?)+/g, '<ul style="margin:16px 0;padding-left:24px;">$&</ul>');
+  // Wrap each list type separately
+  html = html.replace(/(<li data-ol[^>]*>.*<\/li>\n?)+/g, '<ol style="margin:16px 0;padding-left:24px;">$&</ol>');
+  html = html.replace(/(<li data-ul[^>]*>.*<\/li>\n?)+/g, '<ul style="margin:16px 0;padding-left:24px;">$&</ul>');
+
+  // Clean up data attributes
+  html = html.replace(/ data-ol| data-ul/g, '');
 
   // Paragraphs (double newlines)
   html = html.replace(/\n\n/g, '</p><p style="margin:16px 0;line-height:1.7;color:#333;">');

@@ -205,10 +205,8 @@ export function renderBriefingHtml(
     <div style="height:3px;background:${ACCENT_COLOR};margin-bottom:32px;"></div>
 
     <!-- Opening narrative -->
-    <div style="margin-bottom:32px;padding-bottom:24px;border-bottom:1px solid #e5e5e5;">
-      <p style="margin:0;color:#333;font-size:17px;line-height:1.7;font-style:italic;">
-        ${escapeHtml(opening)}
-      </p>
+    <div style="margin-bottom:32px;padding-bottom:24px;border-bottom:1px solid #e5e5e5;font-style:italic;">
+      ${markdownToEmailHtml(opening)}
     </div>
 
     <!-- Cards -->
@@ -216,9 +214,7 @@ export function renderBriefingHtml(
 
     <!-- Closing narrative -->
     <div style="margin-top:32px;padding-top:24px;border-top:1px solid #e5e5e5;">
-      <p style="margin:0;color:#333;font-size:15px;line-height:1.7;">
-        ${escapeHtml(closing)}
-      </p>
+      ${markdownToEmailHtml(closing)}
     </div>
 
     <!-- Footer -->

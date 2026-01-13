@@ -23,11 +23,24 @@ const ACCENT_COLOR = '#c4402f';
  */
 export function markdownToEmailHtml(markdown) {
     let html = markdown;
-    // Escape HTML first
+
+    // Handle fenced code blocks FIRST (before escaping)
+    // These get special treatment for clean copy/paste
+    const codeBlocks = [];
+    html = html.replace(/```(\w*)\n([\s\S]*?)```/g, (_match, lang, code) => {
+        const index = codeBlocks.length;
+        // Trim trailing newline but preserve internal formatting
+        const cleanCode = code.replace(/\n$/, '');
+        codeBlocks.push({ lang, code: cleanCode });
+        return `__CODEBLOCK_${index}__`;
+    });
+
+    // Escape HTML (but not the code block placeholders)
     html = html.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-    // Bold: **text** or __text__
+
+    // Bold: **text** or __text__ (but not our CODEBLOCK placeholders)
     html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
-    html = html.replace(/__(.+?)__/g, '<strong>$1</strong>');
+    html = html.replace(/__(?!CODEBLOCK_)(.+?)__/g, '<strong>$1</strong>');
     // Italic: *text* or _text_
     html = html.replace(/(?<!\*)\*([^*]+?)\*(?!\*)/g, '<em>$1</em>');
     html = html.replace(/(?<!_)_([^_]+?)_(?!_)/g, '<em>$1</em>');
@@ -61,6 +74,34 @@ export function markdownToEmailHtml(markdown) {
     // Clean up empty paragraphs
     html = html.replace(/<p[^>]*><\/p>/g, '');
     html = html.replace(/<p[^>]*><br><\/p>/g, '');
+
+    // Restore code blocks with styled rendering
+    // Box style: light background, left border accent, monospace font
+    // Uses <pre> to preserve whitespace for clean copy/paste
+    for (let i = 0; i < codeBlocks.length; i++) {
+        const { lang, code } = codeBlocks[i];
+        // Escape HTML in the code content
+        const escapedCode = code
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;');
+        // Keep actual newlines for clean copy/paste (pre tag preserves them)
+        // Language label if provided
+        const langLabel = lang ? `<div style="font-size:11px;color:#666;margin-bottom:8px;text-transform:uppercase;letter-spacing:0.5px;">${lang}</div>` : '';
+        // Styled code block - distinct box with left border accent
+        const codeBlockHtml = `</p>
+<div style="margin:16px 0;padding:16px;background:#f8f9fa;border-left:4px solid ${ACCENT_COLOR};border-radius:4px;overflow-x:auto;">
+${langLabel}<pre style="margin:0;font-family:'SF Mono',Monaco,'Cascadia Code',Consolas,monospace;font-size:13px;line-height:1.5;color:#1a1a1a;white-space:pre-wrap;word-wrap:break-word;">${escapedCode}</pre>
+</div>
+<p style="margin:16px 0;line-height:1.7;color:#333;">`;
+        html = html.replace(`__CODEBLOCK_${i}__`, codeBlockHtml);
+    }
+
+    // Clean up any artifacts from code block insertion
+    html = html.replace(/<p[^>]*>\s*<\/p>/g, '');
+    html = html.replace(/<br>\s*<\/p>\s*<div/g, '</p><div');
+    html = html.replace(/<\/div>\s*<p[^>]*>\s*<br>/g, '</div><p style="margin:16px 0;line-height:1.7;color:#333;">');
+
     return html;
 }
 /**

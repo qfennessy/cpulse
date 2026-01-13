@@ -42,12 +42,12 @@ export function markdownToEmailHtml(markdown) {
     html = html.replace(/^### (.+)$/gm, '<h3 style="margin:20px 0 10px;font-size:14px;font-weight:600;color:#666;text-transform:uppercase;letter-spacing:0.5px;">$1</h3>');
     html = html.replace(/^## (.+)$/gm, '<h2 style="margin:24px 0 12px;font-size:18px;font-weight:600;color:#1a1a1a;">$1</h2>');
     html = html.replace(/^# (.+)$/gm, '<h1 style="margin:28px 0 16px;font-size:22px;font-weight:700;color:#1a1a1a;">$1</h1>');
-    // Convert list items with distinct markers
-    html = html.replace(/^\d+\. (.+)$/gm, '<li data-ol style="margin:8px 0;color:#333;">$1</li>');
-    html = html.replace(/^- (.+)$/gm, '<li data-ul style="margin:8px 0;color:#333;">$1</li>');
+    // Convert list items with distinct markers (tight spacing for better readability)
+    html = html.replace(/^\d+\. (.+)$/gm, '<li data-ol style="margin:2px 0;color:#333;">$1</li>');
+    html = html.replace(/^- (.+)$/gm, '<li data-ul style="margin:2px 0;color:#333;">$1</li>');
     // Wrap each list type separately
-    html = html.replace(/(<li data-ol[^>]*>.*<\/li>\n?)+/g, '<ol style="margin:16px 0;padding-left:24px;">$&</ol>');
-    html = html.replace(/(<li data-ul[^>]*>.*<\/li>\n?)+/g, '<ul style="margin:16px 0;padding-left:24px;">$&</ul>');
+    html = html.replace(/(<li data-ol[^>]*>.*<\/li>\n?)+/g, '<ol style="margin:12px 0;padding-left:24px;">$&</ol>');
+    html = html.replace(/(<li data-ul[^>]*>.*<\/li>\n?)+/g, '<ul style="margin:12px 0;padding-left:24px;">$&</ul>');
     // Clean up data attributes
     html = html.replace(/ data-ol| data-ul/g, '');
     // Paragraphs (double newlines)
@@ -89,10 +89,10 @@ export function renderCardHtml(card, index, briefingId) {
       <!-- Feedback buttons -->
       <div style="margin-top:24px;display:flex;align-items:center;gap:12px;">
         <span style="color:#999;font-size:13px;">Was this helpful?</span>
-        <a href="mailto:?subject=cpulse feedback&body=Briefing: ${briefingId}%0ACard: ${index}%0ARating: helpful" style="display:inline-flex;align-items:center;padding:8px 16px;background:#f5f5f5;border-radius:6px;color:#333;text-decoration:none;font-size:13px;font-weight:500;">
+        <a href="mailto:?subject=Commit Pulse feedback&body=Briefing: ${briefingId}%0ACard: ${index}%0ARating: helpful" style="display:inline-flex;align-items:center;padding:8px 16px;background:#f5f5f5;border-radius:6px;color:#333;text-decoration:none;font-size:13px;font-weight:500;">
           &#10003; Yes
         </a>
-        <a href="mailto:?subject=cpulse feedback&body=Briefing: ${briefingId}%0ACard: ${index}%0ARating: not_helpful" style="display:inline-flex;align-items:center;padding:8px 16px;background:#f5f5f5;border-radius:6px;color:#333;text-decoration:none;font-size:13px;font-weight:500;">
+        <a href="mailto:?subject=Commit Pulse feedback&body=Briefing: ${briefingId}%0ACard: ${index}%0ARating: not_helpful" style="display:inline-flex;align-items:center;padding:8px 16px;background:#f5f5f5;border-radius:6px;color:#333;text-decoration:none;font-size:13px;font-weight:500;">
           &#10005; No
         </a>
       </div>

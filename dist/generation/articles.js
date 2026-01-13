@@ -60,20 +60,26 @@ function getWeeklyRotationDays(cardType) {
 
 /**
  * Check if a card type should be generated based on user config, rotation, and feedback.
+ * @param {object} options - Options object
+ * @param {boolean} options.allCards - If true, bypass weekly rotation check
  */
-function shouldGenerateCard(config, dataDir, cardType) {
+function shouldGenerateCard(config, dataDir, cardType, options = {}) {
+    const { allCards = false } = options;
+
     // Check user config - explicit disable
     const enabledCards = config.preferences?.enabled_cards || {};
     if (enabledCards[cardType] === false) {
         return false;
     }
 
-    // Check weekly rotation for advisory cards
-    const rotationDays = getWeeklyRotationDays(cardType);
-    if (rotationDays) {
-        const today = new Date().getDay();
-        if (!rotationDays.includes(today)) {
-            return false;
+    // Check weekly rotation for advisory cards (skip if allCards is true)
+    if (!allCards) {
+        const rotationDays = getWeeklyRotationDays(cardType);
+        if (rotationDays) {
+            const today = new Date().getDay();
+            if (!rotationDays.includes(today)) {
+                return false;
+            }
         }
     }
 
@@ -688,7 +694,8 @@ Output only the briefing content in markdown format, no preamble.`;
     };
 }
 
-export async function generateBriefing(config, signals) {
+export async function generateBriefing(config, signals, options = {}) {
+    const { allCards = false } = options;
     const apiKey = config.anthropic_api_key || process.env.ANTHROPIC_API_KEY;
     if (!apiKey) {
         throw new Error('Anthropic API key not found. Set ANTHROPIC_API_KEY env var or add to config.');
@@ -721,37 +728,38 @@ export async function generateBriefing(config, signals) {
 
     // Generate cards in parallel
     const cardPromises = [];
+    const cardOpts = { allCards };
 
     // Project Continuity card (from Claude Code sessions)
-    if (config.sources.claude_code.enabled && shouldGenerateCard(config, dataDir, 'project_continuity')) {
+    if (config.sources.claude_code.enabled && shouldGenerateCard(config, dataDir, 'project_continuity', cardOpts)) {
         cardPromises.push(generateProjectContinuityCard(client, signals, config, systemPrompt));
     }
     // Code Review card (from GitHub activity)
-    if (config.sources.github.enabled && shouldGenerateCard(config, dataDir, 'code_review')) {
+    if (config.sources.github.enabled && shouldGenerateCard(config, dataDir, 'code_review', cardOpts)) {
         cardPromises.push(generateCodeReviewCard(client, signals, config, systemPrompt));
     }
     // Open Questions card (from session analysis)
-    if (config.sources.claude_code.enabled && shouldGenerateCard(config, dataDir, 'open_questions')) {
+    if (config.sources.claude_code.enabled && shouldGenerateCard(config, dataDir, 'open_questions', cardOpts)) {
         cardPromises.push(generateOpenQuestionsCard(client, questions, config, systemPrompt));
     }
     // Patterns card (from session analysis)
-    if (config.sources.claude_code.enabled && shouldGenerateCard(config, dataDir, 'patterns')) {
+    if (config.sources.claude_code.enabled && shouldGenerateCard(config, dataDir, 'patterns', cardOpts)) {
         cardPromises.push(generatePatternsCard(client, patterns, config, systemPrompt));
     }
     // Post-Merge Feedback card (from GitHub post-merge comments)
-    if (config.sources.github.enabled && shouldGenerateCard(config, dataDir, 'post_merge_feedback')) {
+    if (config.sources.github.enabled && shouldGenerateCard(config, dataDir, 'post_merge_feedback', cardOpts)) {
         cardPromises.push(generatePostMergeFeedbackCard(client, signals.github.postMergeComments, config, systemPrompt));
     }
     // Tech Advisory card (Wed/Thu - stack-aware architectural advice)
-    if (shouldGenerateCard(config, dataDir, 'tech_advisory')) {
+    if (shouldGenerateCard(config, dataDir, 'tech_advisory', cardOpts)) {
         cardPromises.push(generateTechAdvisoryCard(client, techStack, trends, config, systemPrompt));
     }
     // Challenge Insights card (Mon/Tue - PR pattern analysis)
-    if (shouldGenerateCard(config, dataDir, 'challenge_insights')) {
+    if (shouldGenerateCard(config, dataDir, 'challenge_insights', cardOpts)) {
         cardPromises.push(generateChallengeInsightsCard(client, challengeAnalysis, config, systemPrompt));
     }
     // Cost Optimization card (Fri - GCP cost tips)
-    if (shouldGenerateCard(config, dataDir, 'cost_optimization')) {
+    if (shouldGenerateCard(config, dataDir, 'cost_optimization', cardOpts)) {
         cardPromises.push(generateCostOptimizationCard(client, costInsights, techStack, config, systemPrompt));
     }
     const cardResults = await Promise.all(cardPromises);

@@ -33,11 +33,11 @@ export async function collectSignals(config, hoursBack = 168) {
     return signals;
 }
 export async function generateAndSendBriefing(config, options = {}) {
-    const { send = true, save = true, hoursBack = 168 } = options;
+    const { send = true, save = true, hoursBack = 168, allCards = false } = options;
     // Collect signals
     const signals = await collectSignals(config, hoursBack);
     // Generate briefing
-    const briefing = await generateBriefing(config, signals);
+    const briefing = await generateBriefing(config, signals, { allCards });
     // Save briefing
     if (save && config.data_dir) {
         saveBriefing(config.data_dir, briefing);

@@ -1,5 +1,8 @@
 #!/usr/bin/env node
 import { Command } from 'commander';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import { loadConfig, createDefaultConfig, configExists, getConfigPath, generateAndSendBriefing, formatBriefingAsMarkdown, formatBriefingWithNarratives, getLatestBriefing, getBriefingStats, collectSignals, analyzePatterns, formatPatternSummary, extractAllQuestions, formatQuestionsForBriefing, loadFeedback, computeFeedbackStats, recordBriefingFeedback, loadTopicPriorities, updateTopicPriority, createWebServer, loadGlobalMemory, loadProjectMemory, } from './index.js';
 const program = new Command();
 function parseHours(value) {
@@ -13,7 +16,7 @@ function parseHours(value) {
 program
     .name('cpulse')
     .description('Commit Pulse - Personal daily briefings from Claude Code sessions and GitHub activity')
-    .version('0.1.0');
+    .version('0.7.0');
 program
     .command('init')
     .description('Create a default configuration file')
@@ -35,6 +38,7 @@ program
     .option('--hours <hours>', 'Hours of history to analyze', '168')
     .option('--preview', 'Print briefing to stdout instead of sending')
     .option('--simple', 'Use simple formatting without narratives')
+    .option('--all-cards', 'Generate all card types regardless of weekly rotation')
     .action(async (options) => {
     try {
         // Validate hours before loading config to fail fast
@@ -47,6 +51,7 @@ program
             send: options.send,
             save: options.save,
             hoursBack,
+            allCards: options.allCards,
         });
         if (options.preview || !options.send) {
             if (options.simple) {
@@ -552,6 +557,117 @@ program
     }
     catch (error) {
         console.error('Error:', error);
+        process.exit(1);
+    }
+});
+
+// Helper function to recursively copy directory
+function copyDirSync(src, dest) {
+    fs.mkdirSync(dest, { recursive: true });
+    const entries = fs.readdirSync(src, { withFileTypes: true });
+    for (const entry of entries) {
+        const srcPath = path.join(src, entry.name);
+        const destPath = path.join(dest, entry.name);
+        if (entry.isDirectory()) {
+            copyDirSync(srcPath, destPath);
+        } else {
+            fs.copyFileSync(srcPath, destPath);
+        }
+    }
+}
+
+program
+    .command('install')
+    .description('Install cpulse to ~/.cpulse/bin for global use')
+    .option('--link', 'Create symlink in /usr/local/bin (requires sudo)')
+    .option('--force', 'Overwrite existing installation')
+    .action(async (options) => {
+    try {
+        const homeDir = process.env.HOME;
+        if (!homeDir) {
+            console.error('Error: HOME environment variable not set');
+            process.exit(1);
+        }
+
+        const installDir = path.join(homeDir, '.cpulse', 'bin');
+        const cliPath = path.join(installDir, 'cli.js');
+
+        // Check if already installed
+        if (fs.existsSync(installDir) && !options.force) {
+            console.log(`cpulse is already installed at ${installDir}`);
+            console.log('Use --force to overwrite the existing installation.');
+            return;
+        }
+
+        // Find the source directory (dist/)
+        const __filename = fileURLToPath(import.meta.url);
+        const __dirname = path.dirname(__filename);
+        const srcDir = __dirname;
+
+        // Find root package.json (one level up from dist/)
+        const rootDir = path.dirname(srcDir);
+        const packageJsonPath = path.join(rootDir, 'package.json');
+
+        console.log(`Installing cpulse to ${installDir}...`);
+
+        // Remove existing installation if force
+        if (options.force && fs.existsSync(installDir)) {
+            fs.rmSync(installDir, { recursive: true });
+        }
+
+        // Copy dist/ files
+        copyDirSync(srcDir, installDir);
+
+        // Copy package.json for dependencies
+        if (fs.existsSync(packageJsonPath)) {
+            fs.copyFileSync(packageJsonPath, path.join(installDir, 'package.json'));
+        }
+
+        // Make CLI executable
+        fs.chmodSync(cliPath, '755');
+
+        console.log('Installing dependencies...');
+
+        // Run npm install in the install directory
+        const { execSync } = await import('child_process');
+        try {
+            execSync('npm install --omit=dev --silent', {
+                cwd: installDir,
+                stdio: 'pipe',
+            });
+            console.log('✓ Dependencies installed');
+        } catch (npmError) {
+            console.warn('Warning: Could not install dependencies automatically.');
+            console.log(`Run manually: cd ${installDir} && npm install --omit=dev`);
+        }
+
+        console.log('\n✓ Installation complete!');
+        console.log(`\nInstalled to: ${installDir}`);
+
+        console.log('\nTo use cpulse globally, add to your shell config:');
+        console.log(`\n  # Add to ~/.bashrc, ~/.zshrc, or similar:`);
+        console.log(`  alias cpulse='node ${cliPath}'`);
+
+        if (options.link) {
+            const linkPath = '/usr/local/bin/cpulse';
+            console.log(`\nCreating symlink at ${linkPath}...`);
+            console.log('Note: This may require sudo. If it fails, run:');
+            console.log(`  sudo ln -sf ${cliPath} ${linkPath}`);
+            try {
+                if (fs.existsSync(linkPath)) {
+                    fs.unlinkSync(linkPath);
+                }
+                fs.symlinkSync(cliPath, linkPath);
+                console.log('✓ Symlink created successfully!');
+            } catch (linkError) {
+                console.error(`\nFailed to create symlink: ${linkError.message}`);
+                console.log('Run with sudo:');
+                console.log(`  sudo ln -sf ${cliPath} ${linkPath}`);
+            }
+        }
+    }
+    catch (error) {
+        console.error('Error during installation:', error.message);
         process.exit(1);
     }
 });

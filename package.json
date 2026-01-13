@@ -1,6 +1,6 @@
 {
   "name": "cpulse",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "description": "Commit Pulse - Personal daily briefings from Claude Code sessions and GitHub activity",
   "type": "module",
   "engines": {

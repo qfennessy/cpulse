@@ -618,8 +618,9 @@ program
         const srcDir = __dirname;
 
         // Detect if running from installed location
+        // Use path separator to avoid matching sibling dirs like ~/.cpulse-dev
         const cpulseDir = path.join(homeDir, '.cpulse');
-        if (srcDir.startsWith(cpulseDir)) {
+        if (srcDir === cpulseDir || srcDir.startsWith(cpulseDir + path.sep)) {
             console.error('Error: Cannot update from installed location.');
             console.error('To update cpulse, run the install command from the source repository:');
             console.error('  cd /path/to/cpulse && node dist/cli.js install');

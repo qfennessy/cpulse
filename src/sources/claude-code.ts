@@ -46,13 +46,17 @@ function expandPath(path: string): string {
 }
 
 function decodeProjectPath(encoded: string): string {
-  // Project directories are encoded as "-Users-quentin-src-project" -> "/Users/quentin/src/project"
-  if (encoded === '-') return '/';
-  return encoded.replace(/-/g, '/');
+  // Project directories are encoded by replacing "/" with "-", but this encoding
+  // is ambiguous for paths containing hyphens (e.g., "my-project" vs "my/project").
+  // We return the encoded name as-is; parseSession() extracts the actual path
+  // from the session's cwd field which is authoritative.
+  return encoded;
 }
 
 function getProjectName(projectPath: string): string {
-  const parts = projectPath.split('/').filter(Boolean);
+  // Handle both actual paths (/Users/.../project) and encoded names (-Users-...-project)
+  const separator = projectPath.includes('/') ? '/' : '-';
+  const parts = projectPath.split(separator).filter(Boolean);
   return parts[parts.length - 1] || 'unknown';
 }
 

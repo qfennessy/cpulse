@@ -133,7 +133,7 @@ Output only the briefing content in markdown format, no preamble.`;
   });
 
   const content = response.content[0];
-  if (content.type !== 'text') return null;
+  if (!content || content.type !== 'text') return null;
 
   // Extract title from first line if it's a heading
   const lines = content.text.split('\n');
@@ -199,7 +199,7 @@ Output only the briefing content in markdown format, no preamble.`;
   });
 
   const content = response.content[0];
-  if (content.type !== 'text') return null;
+  if (!content || content.type !== 'text') return null;
 
   const lines = content.text.split('\n');
   let title = 'Code Review';

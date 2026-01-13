@@ -117,7 +117,7 @@ export function analyzeProjectPatterns(sessions: ClaudeCodeSession[]): ProjectPa
     } else {
       projectMap.set(key, {
         name: parentProject,
-        path: session.projectPath,
+        path: session.projectPath || session.project,
         sessionCount: 1,
         totalTime: sessionDuration,
         lastActive: session.endTime || session.startTime,

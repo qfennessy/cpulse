@@ -169,6 +169,10 @@ export function updateTopicPriority(
 
   const existing = priorities.find((p) => p.topic.toLowerCase() === topic.toLowerCase());
   if (existing) {
+    // Don't overwrite user-set priorities with feedback-derived ones
+    if (existing.reason === 'user_set' && reason === 'feedback_derived') {
+      return;
+    }
     existing.priority = priority;
     existing.reason = reason;
     existing.lastUpdated = new Date();

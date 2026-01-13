@@ -1,8 +1,19 @@
 import { readFileSync, writeFileSync, existsSync, readdirSync } from 'fs';
 import { join } from 'path';
-import type { Briefing, BriefingFeedback } from '../types/index.js';
+import type { Briefing, BriefingFeedback, ArticleCard } from '../types/index.js';
 
 const BRIEFINGS_FILE = 'briefings.jsonl';
+
+/**
+ * StoredBriefing includes all Briefing fields with proper types for storage.
+ */
+export interface StoredBriefing {
+  id: string;
+  date: Date;
+  cards: ArticleCard[];
+  generatedAt: Date;
+  feedback?: BriefingFeedback;
+}
 
 function getBriefingsPath(dataDir: string): string {
   return join(dataDir, BRIEFINGS_FILE);
@@ -118,4 +129,26 @@ export function getBriefingStats(dataDir: string): {
     feedbackCount,
     helpfulCount,
   };
+}
+
+/**
+ * Get all briefings sorted by date (most recent first).
+ */
+export function getAllBriefings(dataDir: string): StoredBriefing[] {
+  const briefings = loadBriefings(dataDir);
+
+  // Sort by date, most recent first
+  briefings.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+  return briefings as StoredBriefing[];
+}
+
+/**
+ * Get a single briefing by ID.
+ */
+export function getBriefing(dataDir: string, id: string): StoredBriefing | null {
+  const briefings = loadBriefings(dataDir);
+  const briefing = briefings.find((b) => b.id === id);
+
+  return briefing ? (briefing as StoredBriefing) : null;
 }

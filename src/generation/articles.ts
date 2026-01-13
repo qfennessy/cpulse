@@ -7,6 +7,7 @@ import type {
   ClaudeCodeSession,
   GitHubCommit,
   GitHubPR,
+  PostMergeComment,
 } from '../types/index.js';
 import {
   analyzePatterns,
@@ -195,6 +196,55 @@ function formatStaleBranchesSummary(branches: string[], repos: string[], withLin
 
   if (branches.length > 5) {
     lines.push(`... and ${branches.length - 5} more stale branches`);
+  }
+
+  return lines.join('\n');
+}
+
+function formatPostMergeCommentsSummary(comments: PostMergeComment[]): string {
+  if (comments.length === 0) return 'No post-merge comments found';
+
+  const lines: string[] = [];
+
+  // Group by PR
+  const byPR = new Map<string, PostMergeComment[]>();
+  for (const comment of comments) {
+    const key = `${comment.repo}#${comment.prNumber}`;
+    if (!byPR.has(key)) {
+      byPR.set(key, []);
+    }
+    byPR.get(key)!.push(comment);
+  }
+
+  for (const [prKey, prComments] of byPR) {
+    const first = prComments[0];
+    const mergedDate = first.mergedAt.toLocaleDateString();
+    lines.push(`\n**${prKey}: ${first.prTitle}** (merged ${mergedDate})`);
+
+    for (const comment of prComments.slice(0, 5)) {
+      const timeAfterMerge = Math.round(
+        (comment.createdAt.getTime() - comment.mergedAt.getTime()) / (1000 * 60 * 60)
+      );
+      const timeLabel = timeAfterMerge < 24
+        ? `${timeAfterMerge}h after merge`
+        : `${Math.round(timeAfterMerge / 24)}d after merge`;
+
+      const truncatedBody = comment.body.length > 150
+        ? comment.body.substring(0, 150) + '...'
+        : comment.body;
+
+      const location = comment.isReviewComment && comment.path
+        ? ` on \`${comment.path}${comment.line ? `:${comment.line}` : ''}\``
+        : '';
+
+      lines.push(`  - **@${comment.author}**${location} (${timeLabel}):`);
+      lines.push(`    "${truncatedBody}"`);
+      lines.push(`    [View comment](${comment.url})`);
+    }
+
+    if (prComments.length > 5) {
+      lines.push(`  ... and ${prComments.length - 5} more comments`);
+    }
   }
 
   return lines.join('\n');
@@ -464,6 +514,65 @@ Output only the briefing content in markdown format, no preamble.`;
   };
 }
 
+export async function generatePostMergeFeedbackCard(
+  client: Anthropic,
+  comments: PostMergeComment[],
+  config: Config
+): Promise<ArticleCard | null> {
+  if (comments.length === 0) return null;
+
+  const commentsSummary = formatPostMergeCommentsSummary(comments);
+
+  const prompt = `Based on these post-merge PR comments (comments that were added AFTER the PR was already merged), generate a "Post-Merge Feedback" briefing card.
+
+Post-merge comments require attention because:
+1. The code is already in production/main branch
+2. Feedback might indicate bugs, security issues, or improvements needed
+3. Follow-up work may be required
+
+Post-merge comments found:
+${commentsSummary}
+
+Generate a briefing that:
+1. Highlights the most important feedback that needs attention
+2. Groups related feedback by PR or theme
+3. Notes any comments that suggest bugs or critical issues
+4. Suggests follow-up actions (e.g., create issue, hotfix, address in next PR)
+
+Keep it concise and actionable. Focus on what needs immediate attention vs. what can wait.
+Output only the briefing content in markdown format, no preamble.`;
+
+  const response = await client.messages.create({
+    model: 'claude-sonnet-4-20250514',
+    max_tokens: 1024,
+    system: SYSTEM_PROMPT,
+    messages: [{ role: 'user', content: prompt }],
+  });
+
+  const content = response.content[0];
+  if (!content || content.type !== 'text') return null;
+
+  const lines = content.text.split('\n');
+  let title = 'Post-Merge Feedback';
+  let body = content.text;
+
+  if (lines[0].startsWith('#')) {
+    title = lines[0].replace(/^#+\s*/, '');
+    body = lines.slice(1).join('\n').trim();
+  }
+
+  return {
+    type: 'post_merge_feedback',
+    title,
+    content: body,
+    priority: 1, // High priority - post-merge feedback needs attention
+    metadata: {
+      commentCount: comments.length,
+      prCount: new Set(comments.map((c) => `${c.repo}#${c.prNumber}`)).size,
+    },
+  };
+}
+
 export async function generateBriefing(
   config: Config,
   signals: ExtractedSignals
@@ -503,6 +612,11 @@ export async function generateBriefing(
   // Patterns card (from session analysis)
   if (config.sources.claude_code.enabled && shouldIncludeCardType(dataDir, 'patterns')) {
     cardPromises.push(generatePatternsCard(client, patterns, config));
+  }
+
+  // Post-Merge Feedback card (from GitHub post-merge comments)
+  if (config.sources.github.enabled && shouldIncludeCardType(dataDir, 'post_merge_feedback')) {
+    cardPromises.push(generatePostMergeFeedbackCard(client, signals.github.postMergeComments, config));
   }
 
   const cardResults = await Promise.all(cardPromises);

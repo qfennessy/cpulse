@@ -14,6 +14,7 @@ const CARD_TYPE_STYLES: Record<string, { color: string; icon: string; label: str
   learning: { color: '#0891b2', icon: '&#128218;', label: 'Learning' },
   suggestions: { color: '#be185d', icon: '&#128161;', label: 'Suggestions' },
   weekly_summary: { color: '#4f46e5', icon: '&#128197;', label: 'Weekly' },
+  post_merge_feedback: { color: '#dc2626', icon: '&#128680;', label: 'Post-Merge' },
 };
 
 /**

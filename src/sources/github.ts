@@ -4,6 +4,7 @@ import type {
   GitHubCommit,
   GitHubPR,
   GitHubSourceConfig,
+  PostMergeComment,
 } from '../types/index.js';
 
 export async function createGitHubClient(
@@ -233,21 +234,141 @@ export async function getStaleBranches(
   return staleBranches.slice(0, 20);
 }
 
+/**
+ * Get comments on recently merged PRs that were created after the PR was merged.
+ * These are "post-merge feedback" comments that might need attention.
+ */
+export async function getPostMergeComments(
+  octokit: Octokit,
+  config: GitHubSourceConfig,
+  daysBack: number = 14
+): Promise<PostMergeComment[]> {
+  const postMergeComments: PostMergeComment[] = [];
+  const since = new Date(Date.now() - daysBack * 24 * 60 * 60 * 1000);
+
+  let repos = config.repos;
+
+  if (!repos || repos.length === 0) {
+    const { data: userRepos } = await octokit.rest.repos.listForAuthenticatedUser({
+      sort: 'pushed',
+      per_page: 20,
+      visibility: config.include_private ? 'all' : 'public',
+    });
+    repos = userRepos.map((r: { full_name: string }) => r.full_name);
+  }
+
+  for (const repoFullName of repos.slice(0, 10)) {
+    const [owner, repo] = repoFullName.split('/');
+    if (!owner || !repo) continue;
+
+    try {
+      // Get recently merged PRs
+      const { data: mergedPRs } = await octokit.rest.pulls.list({
+        owner,
+        repo,
+        state: 'closed',
+        sort: 'updated',
+        direction: 'desc',
+        per_page: 20,
+      });
+
+      for (const pr of mergedPRs) {
+        // Skip if not merged or merged too long ago
+        if (!pr.merged_at) continue;
+        const mergedAt = new Date(pr.merged_at);
+        if (mergedAt < since) continue;
+
+        // Get review comments (inline code comments)
+        try {
+          const { data: reviewComments } = await octokit.rest.pulls.listReviewComments({
+            owner,
+            repo,
+            pull_number: pr.number,
+            per_page: 50,
+          });
+
+          for (const comment of reviewComments) {
+            const commentDate = new Date(comment.created_at);
+            // Only include comments created AFTER the PR was merged
+            if (commentDate > mergedAt) {
+              postMergeComments.push({
+                id: comment.id,
+                prNumber: pr.number,
+                prTitle: pr.title,
+                repo: repoFullName,
+                author: comment.user?.login || 'unknown',
+                body: comment.body || '',
+                createdAt: commentDate,
+                mergedAt,
+                url: comment.html_url,
+                isReviewComment: true,
+                path: comment.path,
+                line: comment.line || comment.original_line,
+              });
+            }
+          }
+        } catch {
+          // Skip on error
+        }
+
+        // Get issue comments (general PR comments)
+        try {
+          const { data: issueComments } = await octokit.rest.issues.listComments({
+            owner,
+            repo,
+            issue_number: pr.number,
+            per_page: 50,
+          });
+
+          for (const comment of issueComments) {
+            const commentDate = new Date(comment.created_at);
+            // Only include comments created AFTER the PR was merged
+            if (commentDate > mergedAt) {
+              postMergeComments.push({
+                id: comment.id,
+                prNumber: pr.number,
+                prTitle: pr.title,
+                repo: repoFullName,
+                author: comment.user?.login || 'unknown',
+                body: comment.body || '',
+                createdAt: commentDate,
+                mergedAt,
+                url: comment.html_url,
+                isReviewComment: false,
+              });
+            }
+          }
+        } catch {
+          // Skip on error
+        }
+      }
+    } catch {
+      // Skip repos we can't access
+    }
+  }
+
+  // Sort by date, most recent first
+  postMergeComments.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+
+  return postMergeComments;
+}
+
 export async function getGitHubActivity(
   config: GitHubSourceConfig,
   hoursBack: number = 168
 ): Promise<GitHubActivity> {
   if (!config.enabled) {
-    return { commits: [], pullRequests: [], staleBranches: [] };
+    return { commits: [], pullRequests: [], staleBranches: [], postMergeComments: [] };
   }
 
   const octokit = await createGitHubClient(config);
 
-  const [commits, pullRequests, staleBranches] = await Promise.all([
+  const [commits, pullRequests, staleBranches, postMergeComments] = await Promise.all([
     getRecentCommits(octokit, config, hoursBack),
     getOpenPullRequests(octokit, config),
     getStaleBranches(octokit, config),
+    getPostMergeComments(octokit, config),
   ]);
 
-  return { commits, pullRequests, staleBranches };
+  return { commits, pullRequests, staleBranches, postMergeComments };
 }

@@ -22,6 +22,7 @@ import {
   loadTopicPriorities,
   updateTopicPriority,
   groupByParentProject,
+  createWebServer,
 } from './index.js';
 import type { BriefingFeedback } from './types/index.js';
 
@@ -433,6 +434,36 @@ program
       }
     } catch (error) {
       console.error('Error:', error);
+      process.exit(1);
+    }
+  });
+
+program
+  .command('serve')
+  .description('Start the web dashboard')
+  .option('-p, --port <port>', 'Port to run on', '3000')
+  .option('-h, --host <host>', 'Host to bind to', 'localhost')
+  .action(async (options) => {
+    try {
+      const port = parseInt(options.port, 10);
+      if (isNaN(port) || port <= 0 || port > 65535) {
+        console.error('Invalid port number');
+        process.exit(1);
+      }
+
+      const server = createWebServer({
+        port,
+        host: options.host,
+      });
+
+      await server.start();
+      console.log(`\nAvailable routes:`);
+      console.log(`  /           - Briefing history`);
+      console.log(`  /analytics  - Analytics dashboard`);
+      console.log(`  /config     - Configuration viewer`);
+      console.log(`\nPress Ctrl+C to stop the server`);
+    } catch (error) {
+      console.error('Error starting server:', error);
       process.exit(1);
     }
   });

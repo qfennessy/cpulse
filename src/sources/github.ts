@@ -361,7 +361,7 @@ async function getResolvedCommentUrls(
             reviewThreads(first: 100) {
               nodes {
                 isResolved
-                comments(first: 10) {
+                comments(first: 100) {
                   nodes {
                     url
                   }
@@ -395,8 +395,9 @@ async function getResolvedCommentUrls(
         }
       }
     }
-  } catch {
-    // GraphQL errors are non-fatal, just return empty set
+  } catch (error) {
+    // GraphQL errors are non-fatal, log and return empty set
+    console.error(`[cpulse] Failed to fetch resolved threads for ${owner}/${repo}#${prNumber}:`, error);
   }
 
   return resolvedUrls;

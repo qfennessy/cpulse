@@ -33,6 +33,7 @@ export interface PreferencesConfig {
     max_cards: number;
     focus_topics: string[];
     ignored_topics: string[];
+    enabled_cards?: Record<string, boolean>;
 }
 export interface Config {
     email: EmailConfig;

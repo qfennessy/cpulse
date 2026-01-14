@@ -4,7 +4,7 @@
  *
  * Created: 2026-01-13
  */
-import { readFileSync, existsSync } from 'fs';
+import { readFileSync, existsSync, statSync } from 'fs';
 import { join, dirname } from 'path';
 import { execSync } from 'child_process';
 const MEMORY_FILENAME = 'memory.md';
@@ -53,7 +53,7 @@ export function loadMemoryFile(filePath, projectName, gitRoot = null) {
     }
     try {
         const content = readFileSync(filePath, 'utf-8');
-        const stats = require('fs').statSync(filePath);
+        const stats = statSync(filePath);
         return {
             projectName,
             projectPath: dirname(filePath),
@@ -109,7 +109,7 @@ export function getGitRoot(path) {
  * Extract project name from path.
  */
 export function extractProjectName(projectPath) {
-    const parts = projectPath.split('/');
+    const parts = projectPath.split('/').filter(Boolean);
     return parts[parts.length - 1] || 'unknown';
 }
 /**

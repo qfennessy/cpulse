@@ -528,8 +528,24 @@ export async function generateBriefing(config, signals, options = {}) {
     }
     const cardResults = await Promise.all(cardPromises);
     const cards = cardResults.filter((c) => c !== null);
-    // Sort by priority
-    cards.sort((a, b) => a.priority - b.priority);
+    // Sort by config order (enabled_cards key order), then by priority as fallback
+    const enabledCards = config.preferences?.enabled_cards || {};
+    const cardOrder = Object.keys(enabledCards);
+    cards.sort((a, b) => {
+        const aIndex = cardOrder.indexOf(a.type);
+        const bIndex = cardOrder.indexOf(b.type);
+        // If both in config, use config order
+        if (aIndex !== -1 && bIndex !== -1) {
+            return aIndex - bIndex;
+        }
+        // If only one in config, it comes first
+        if (aIndex !== -1)
+            return -1;
+        if (bIndex !== -1)
+            return 1;
+        // Neither in config, fall back to priority
+        return a.priority - b.priority;
+    });
     // Limit to max_cards
     const limitedCards = cards.slice(0, config.preferences.max_cards);
     const briefing = {

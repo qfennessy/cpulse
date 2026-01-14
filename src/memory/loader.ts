@@ -5,7 +5,7 @@
  * Created: 2026-01-13
  */
 
-import { readFileSync, existsSync } from 'fs';
+import { readFileSync, existsSync, statSync } from 'fs';
 import { join, dirname } from 'path';
 import { execSync } from 'child_process';
 
@@ -87,7 +87,7 @@ export function loadMemoryFile(
 
   try {
     const content = readFileSync(filePath, 'utf-8');
-    const stats = require('fs').statSync(filePath);
+    const stats = statSync(filePath);
 
     return {
       projectName,
@@ -148,7 +148,7 @@ export function getGitRoot(path: string): string | null {
  * Extract project name from path.
  */
 export function extractProjectName(projectPath: string): string {
-  const parts = projectPath.split('/');
+  const parts = projectPath.split('/').filter(Boolean);
   return parts[parts.length - 1] || 'unknown';
 }
 

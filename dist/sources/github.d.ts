@@ -7,6 +7,7 @@ export declare function getStaleBranches(octokit: Octokit, config: GitHubSourceC
 /**
  * Get comments on recently merged PRs that were created after the PR was merged.
  * These are "post-merge feedback" comments that might need attention.
+ * Filters out comments from resolved review threads.
  */
 export declare function getPostMergeComments(octokit: Octokit, config: GitHubSourceConfig, daysBack?: number): Promise<PostMergeComment[]>;
 export declare function getGitHubActivity(config: GitHubSourceConfig, hoursBack?: number): Promise<GitHubActivity>;

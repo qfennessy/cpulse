@@ -530,7 +530,7 @@ export async function generateBriefing(config, signals, options = {}) {
     const cards = cardResults.filter((c) => c !== null);
     // Sort by config order (enabled_cards key order), then by priority as fallback
     const enabledCards = config.preferences?.enabled_cards || {};
-    const cardOrder = Object.keys(enabledCards);
+    const cardOrder = Object.keys(enabledCards).filter(key => enabledCards[key]);
     cards.sort((a, b) => {
         const aIndex = cardOrder.indexOf(a.type);
         const bIndex = cardOrder.indexOf(b.type);

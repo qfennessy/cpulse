@@ -455,6 +455,8 @@ Generate a briefing that:
 3. Notes any comments that suggest bugs or critical issues
 4. Suggests follow-up actions (e.g., create issue, hotfix, address in next PR)
 
+IMPORTANT: For EVERY issue or comment you mention, you MUST include a markdown link to the comment using the URLs provided in the input data. Use format: [descriptive text](url)
+
 Keep it concise and actionable. Focus on what needs immediate attention vs. what can wait.
 Output only the briefing content in markdown format, no preamble.`;
     const response = await client.messages.create({

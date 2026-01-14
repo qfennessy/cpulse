@@ -342,8 +342,70 @@ export async function getStaleBranches(
 }
 
 /**
+ * Get URLs of review comments that are in resolved threads.
+ * Uses GraphQL to check thread resolution status.
+ */
+async function getResolvedCommentUrls(
+  octokit: Octokit,
+  owner: string,
+  repo: string,
+  prNumber: number
+): Promise<Set<string>> {
+  const resolvedUrls = new Set<string>();
+
+  try {
+    const query = `
+      query($owner: String!, $repo: String!, $prNumber: Int!) {
+        repository(owner: $owner, name: $repo) {
+          pullRequest(number: $prNumber) {
+            reviewThreads(first: 100) {
+              nodes {
+                isResolved
+                comments(first: 10) {
+                  nodes {
+                    url
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    `;
+
+    const result = await octokit.graphql<{
+      repository: {
+        pullRequest: {
+          reviewThreads: {
+            nodes: Array<{
+              isResolved: boolean;
+              comments: {
+                nodes: Array<{ url: string }>;
+              };
+            }>;
+          };
+        };
+      };
+    }>(query, { owner, repo, prNumber });
+
+    for (const thread of result.repository.pullRequest.reviewThreads.nodes) {
+      if (thread.isResolved) {
+        for (const comment of thread.comments.nodes) {
+          resolvedUrls.add(comment.url);
+        }
+      }
+    }
+  } catch {
+    // GraphQL errors are non-fatal, just return empty set
+  }
+
+  return resolvedUrls;
+}
+
+/**
  * Get comments on recently merged PRs that were created after the PR was merged.
  * These are "post-merge feedback" comments that might need attention.
+ * Filters out comments from resolved review threads.
  */
 export async function getPostMergeComments(
   octokit: Octokit,
@@ -385,6 +447,9 @@ export async function getPostMergeComments(
         const mergedAt = new Date(pr.merged_at);
         if (mergedAt < since) continue;
 
+        // Get resolved comment URLs to filter them out
+        const resolvedUrls = await getResolvedCommentUrls(octokit, owner, repo, pr.number);
+
         // Get review comments (inline code comments)
         try {
           const { data: reviewComments } = await octokit.rest.pulls.listReviewComments({
@@ -397,7 +462,8 @@ export async function getPostMergeComments(
           for (const comment of reviewComments) {
             const commentDate = new Date(comment.created_at);
             // Only include comments created AFTER the PR was merged
-            if (commentDate > mergedAt) {
+            // and not in a resolved thread
+            if (commentDate > mergedAt && !resolvedUrls.has(comment.html_url)) {
               const severity = classifyCommentSeverity(comment.body || '');
               postMergeComments.push({
                 id: comment.id,

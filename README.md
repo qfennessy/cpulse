@@ -228,11 +228,36 @@ To receive daily briefings, add a cron job:
 crontab -e
 ```
 
-Add:
+**Important:** Cron runs with a minimal environment - it doesn't have your shell's PATH or environment variables. You need to configure these explicitly.
+
+If you keep your API keys in a secrets file (e.g., `~/.zshrc.secrets`):
 
 ```
+# Required: Set PATH to include node's directory (find it with: dirname $(which node))
+# macOS with nvm example shown; Linux would use /home/yourname/...
+PATH=/Users/yourname/.nvm/versions/node/v20.19.0/bin:/usr/local/bin:/usr/bin:/bin
+
+# Run at 6am daily, sourcing secrets file for API keys
+0 6 * * * /bin/bash -c 'source ~/.zshrc.secrets && cpulse generate' >> ~/.cpulse/cron.log 2>&1
+```
+
+Your secrets file should contain exports like:
+```bash
+export GITHUB_PERSONAL_ACCESS_TOKEN='ghp_xxxxx'
+export ANTHROPIC_API_KEY='sk-ant-xxxxx'
+```
+
+Alternatively, set the API keys directly in the crontab:
+
+```
+PATH=/Users/yourname/.nvm/versions/node/v20.19.0/bin:/usr/local/bin:/usr/bin:/bin
+GITHUB_PERSONAL_ACCESS_TOKEN=ghp_xxxxx
+ANTHROPIC_API_KEY=sk-ant-xxxxx
+
 0 6 * * * cpulse generate >> ~/.cpulse/cron.log 2>&1
 ```
+
+Check `~/.cpulse/cron.log` if briefings aren't arriving to debug any issues.
 
 ## Card Types
 
